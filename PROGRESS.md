@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 9 — V1 已验收；额外的 output 暂存实验出现性能回退，下一步 V2 Warp Shuffle
+Day 9 — V1 基线已恢复，V2 Warp Shuffle 任务框架已建立，待学习者实现规约
 
 ## 已完成
 
@@ -264,13 +264,24 @@ Day 9 — V1 已验收；额外的 output 暂存实验出现性能回退，下�
   相对已验收 V1 基线的 `0.005178 ms` 延迟增加约 `75.6%`；其余三个
   测试形状也均回退。global-load request/sector 仍为 `49152/196608`；
   这次优化没有带来性能收益，详细对照已记入 `07_softmax/README.md`。
+- 学习者表示已对暂存版补跑正确性及 Compute Sanitizer，但目前只提供
+  命令，尚无退出码和错误/泄漏摘要；这项安全复验暂不标记为通过。
+- 已核对当前 `v1.cu`：归一化阶段已恢复为直接从 input 读取并重新
+  计算 `expf`，不再把中间值暂存到 output；可继续作为 V2 对照基线。
+- 已创建 V2 Warp Shuffle Softmax 可编译模板与中文任务说明。保留
+  V1 的连续列扫描、CPU Reference、17 个 shape、CUDA Event 和
+  单 kernel Profile 入口；warp max/sum 及跨 warp 规约留给学习者实现。
+  CMake 默认构建 V1/V2，V0 目标归档为注释。
+- 本地 CMake 配置及 `softmax_v1`/`softmax_v2` 构建通过；恢复后的
+  V1 重新运行 17 个 shape 全部 PASS、退出码 0。空 V2 模板的
+  17 个 shape 均按预期 FAIL、退出码 1；未使用的 partial/shared
+  变量产生编译 warning，完成 TODO 后应消失。
 
 ## 当前任务
 
-- 下一步按计划准备 V2 Warp Shuffle Softmax：继续由学习者实现核心
-  warp/block 规约，沿用现有正确性、Sanitizer、Benchmark 和 Profile
-  方法；此阶段不预先扩展到 V3。V1/V2 对比应使用已验收的直接重算
-  `expf` 基线，而非当前工作树中的较慢暂存变体。
+- 学习者完成 V2 的 warp max、warp sum 与两次跨 warp 规约；
+  随后用现有框架验证正确性与 Sanitizer，交替测 V1/V2 的
+  CUDA Event，并对比最小化 Nsight Compute 指标。
 
 ## 当前问题
 
@@ -283,9 +294,9 @@ Day 9 — V1 已验收；额外的 output 暂存实验出现性能回退，下�
   全部三轮均值作修正版 V1 的精确速度比基线。
 - V1 列映射同时改变 global load 和 store 的线程地址分布；现有指标
   能证明 load sector/request 降低，不能单独量化 load 对全部加速的贡献。
-- 暂存 `expf` 变体尚缺 Compute Sanitizer 复验，以及 output store
-  与缓存路径的 Profile；目前足以判断没有观测到收益，但不足以确定
-  唯一的性能回退原因。
+- 暂存 `expf` 变体的 Compute Sanitizer 摘要与退出码尚未收到；
+  output store 与缓存路径也未 Profile。目前足以判断没有观测到
+  性能收益，但不足以确定唯一的回退原因。
 
 ## 今日关键知识
 
@@ -406,10 +417,13 @@ Day 9 — V1 已验收；额外的 output 暂存实验出现性能回退，下�
   直接重算版每元素 3 load + 1 store + 2 次源码 `expf`，暂存版
   3 load + 2 store + 1 次源码 `expf`。实测后者更慢，说明少算一次
   昂贵函数不自动等于整个 kernel 更快。
+- Softmax V2 仍保持每行一个 256 线程 block：8 个 warp 分别规约
+  局部值，warp 0 再规约 8 个 partial；跨 warp 传递仍需要 shared
+  memory 和 block barrier。V2 是否更快仍须实测。
 
 ## 下一任务
 
-- 若要继续确认暂存变体的性能回退原因，由学习者补跑 Sanitizer，
-  在同一轮中交替测量直接重算/暂存两版，并采集 global-store 指标。
-  随后保留已验收的 V1 基线，准备 V2 Warp Shuffle 中文任务框架；
-  核心 kernel 仍由学习者实现。
+- 学习者完成 `07_softmax/v2.cu` 中四处规约 TODO，并提交 17 个 shape
+  的正确性、Sanitizer 摘要与退出码、V1/V2 交替三轮 Event、
+  最小化 Profile 原始输出供 Review。暂存变体的 Sanitizer 摘要若补发，
+  再把该实验的安全复验状态补记为通过或失败。

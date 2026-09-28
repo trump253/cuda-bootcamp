@@ -73,9 +73,13 @@ endfunction()
 # add_executable(vector_add_half2 06_fp16_half2/half2.cu)
 # target_include_directories(vector_add_half2 PRIVATE common 06_fp16_half2)
 
-# Day 9：保留 V0 基线；V1 的 shared-memory kernel 由学习者完成。
-add_executable(softmax_v0 07_softmax/v0.cu)
-target_include_directories(softmax_v0 PRIVATE common 07_softmax)
+# Day 9 V0 已完成；需要复查时取消以下两行注释。
+# add_executable(softmax_v0 07_softmax/v0.cu)
+# target_include_directories(softmax_v0 PRIVATE common 07_softmax)
 
+# Day 9：保留已验收的 V1 基线，与学习者实现的 V2 Warp Shuffle 对照。
 add_executable(softmax_v1 07_softmax/v1.cu)
 target_include_directories(softmax_v1 PRIVATE common 07_softmax)
+
+add_executable(softmax_v2 07_softmax/v2.cu)
+target_include_directories(softmax_v2 PRIVATE common 07_softmax)

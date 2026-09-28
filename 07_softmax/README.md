@@ -3,16 +3,18 @@
 本节输入、输出均为行主序 FP32 矩阵，形状 `[rows, hidden]`。每一行独立执行
 Softmax。按计划依次完成 V0 逐行朴素版、V1 Shared Memory、V2 Warp Shuffle、
 V3 合理向量化；每版都要有正确性、Benchmark 与必要的 Profile 证据，不能只凭
-源码推断加速。V0/V1 已验收；V2/V3 暂不提前实现。
+源码推断加速。V0/V1 已验收；当前开放 V2，V3 暂不提前实现。
 
 ## 当前文件
 
 - `v0.cu`：学习者已实现 V0 逐行串行 GPU kernel；目前保留了原模板的 TODO 注释。
 - `v1.cu`：学习者已实现每行一个 block 的 Shared Memory max/sum 规约。
+- `v2.cu`：复用 V1 的局部扫描与写回，warp/block 规约保留中文 TODO。
 - `softmax_harness.h`：共用的确定性输入、CPU Reference、GPU 正确性校验、
   CUDA Event Benchmark 和单次 kernel Profile 入口；不用重新写测试样板。
 - `DAY9_V0_TASK.md`：已完成的 V0 任务说明。
 - `DAY9_V1_TASK.md`：已完成的 V1 任务、验收标准和提交内容。
+- `DAY9_V2_TASK.md`：当前 V2 Warp Shuffle 任务与验收标准。
 
 V1 的初版与列映射修正版均已完成正确性、Benchmark/Profile 对照。
 
@@ -132,8 +134,9 @@ Re-benchmark 和 Notes 已闭环；下一版按计划由学习者实现 V2 Warp 
 学习者又尝试在求指数和的循环里计算 `e=expf(x-row_max)`，先写入
 `output`，归一化时从 `output` 读回并乘 `inv_sum`。这在源码层面将每个
 元素的 `expf` 从两次降到一次，但也把一次最终写回变为“中间写回 +
-读回 + 最终写回”。17 个正确性用例全部 `PASS`；本次输出未包含该
-变体的 Compute Sanitizer 报告，不能据此声称已完成内存安全复验。
+读回 + 最终写回”。17 个正确性用例全部 `PASS`；学习者随后表示已补跑
+Compute Sanitizer，但尚未提供退出码及摘要原始输出，因此内存安全复验
+仍待证据确认。
 
 先前已验收的 V1 列映射修正版与本次暂存变体的 CUDA Event 三轮数据：
 
@@ -156,5 +159,6 @@ Profiler 时长为 `12.16 µs`，而此前直接重算版为 `10.94 µs`。
 `expf`。第三遍从读取 input 变成读取 output，load 次数没有减少，
 另多一次 output store。global-load Profile 数值不变与此相符；
 store 的实际指令和缓存/DRAM 流量尚未采集，不能断言单一的回退原因。
-原修正版继续作为 V1 性能基线；当前工作树中的 `v1.cu` 是较慢的
-暂存实验版，进入 V2 对照前需保留或恢复已验收的基线实现。
+原修正版继续作为 V1 性能基线；学习者已将工作树中的 `v1.cu` 恢复为
+归一化时重新计算 `expf` 的版本。V2 用它做同配置对照，暂存实验只保留
+为一次负收益记录。

@@ -59,9 +59,11 @@ cuda-bootcamp/
     ├── softmax_harness.h
     ├── v0.cu
     ├── v1.cu
+    ├── v2.cu
     ├── README.md
     ├── DAY9_V0_TASK.md
-    └── DAY9_V1_TASK.md
+    ├── DAY9_V1_TASK.md
+    └── DAY9_V2_TASK.md
 ```
 
 ## 当前进度
@@ -75,9 +77,9 @@ cuda-bootcamp/
 - Day 8 FP16/half2：正确性、memcheck、同配置三轮 Benchmark、Nsight Compute
   对照与 Notes 已完成，验收通过。
 
-Day 8 的验收记录位于 `06_fp16_half2/README.md`；Day 9 Softmax 的 V0
-逐行朴素版已验收，当前由学习者实现 V1 Shared Memory 版。详细进度见
-`PROGRESS.md`。V1 模板中的 kernel 尚为空，完成 TODO 前正确性测试会失败。
+Day 8 的验收记录位于 `06_fp16_half2/README.md`；Day 9 Softmax 的
+V0/V1 已验收，当前由学习者实现 V2 Warp Shuffle 版。详细进度见
+`PROGRESS.md`。V2 模板可编译，但规约 TODO 未完成前正确性测试会失败。
 已学习的问题与答案持续整理在 `CUDA_复习与面试问答.md`。
 
 ## 构建与运行
@@ -85,10 +87,10 @@ Day 8 的验收记录位于 `06_fp16_half2/README.md`；Day 9 Softmax 的 V0
 ```bash
 cmake -S . -B build
 cmake --build build -j
-./build/softmax_v1 --correctness-only
+./build/softmax_v2 --correctness-only
 ```
 
-通常会注释已完成练习的 CMake target；当前保留 Day 9 的 V0/V1 目标用于对照。
+通常会注释已完成练习的 CMake target；当前保留 Day 9 的 V1/V2 目标用于对照。
 需要重新构建历史练习时，取消 `CMakeLists.txt` 中对应注释。
 项目级 CUDA 编译架构默认是 `sm_75`（RTX 2080 Ti）：所有通过本项目 CMake
 构建的 CUDA target 都会使用它，包括重新启用的历史 target。它不影响在项目外
@@ -97,14 +99,14 @@ cmake --build build -j
 只构建当前练习：
 
 ```bash
-cmake --build build --target softmax_v0 softmax_v1 -j
+cmake --build build --target softmax_v1 softmax_v2 -j
 ```
 
 正确性完成后运行：
 
 ```bash
 compute-sanitizer --tool memcheck --leak-check full --error-exitcode 99 \
-  ./build/softmax_v1 --correctness-only
+  ./build/softmax_v2 --correctness-only
 ```
 
 ## 协作方式

@@ -3,7 +3,7 @@
 本节输入、输出均为行主序 FP32 矩阵，形状 `[rows, hidden]`。每一行独立执行
 Softmax。按计划依次完成 V0 逐行朴素版、V1 Shared Memory、V2 Warp Shuffle、
 V3 合理向量化；每版都要有正确性、Benchmark 与必要的 Profile 证据，不能只凭
-源码推断加速。V0 基线已验收，现在开放 V1；V2/V3 暂不提前实现。
+源码推断加速。V0/V1 已验收；V2/V3 暂不提前实现。
 
 ## 当前文件
 
@@ -12,9 +12,9 @@ V3 合理向量化；每版都要有正确性、Benchmark 与必要的 Profile �
 - `softmax_harness.h`：共用的确定性输入、CPU Reference、GPU 正确性校验、
   CUDA Event Benchmark 和单次 kernel Profile 入口；不用重新写测试样板。
 - `DAY9_V0_TASK.md`：已完成的 V0 任务说明。
-- `DAY9_V1_TASK.md`：当前 V1 任务、验收标准和提交内容。
+- `DAY9_V1_TASK.md`：已完成的 V1 任务、验收标准和提交内容。
 
-V1 的正确性和首次 Benchmark/Profile 已完成；访存映射仍待一次针对性对照。
+V1 的初版与列映射修正版均已完成正确性、Benchmark/Profile 对照。
 
 ## 计时口径
 
@@ -54,15 +54,15 @@ L1/TEX global-load sector `1572864`，即 `32 sector/request`。这与源码的
 `1.77 ms` 是 Profile 条件下的耗时，不与正常 Event 的 `1.250821 ms` 混比。
 
 V0 的正确性、Benchmark、Profile 和基线 Notes 已验收；Day 9 尚未结束。
-V1 由学习者实现后，要在相同 shape、GPU 和构建条件下与此基线对照。
+V1 与该基线采用相同 shape、GPU 和构建条件对照。
 
-## V1 当前实现：正确，但仍是跨 sector 访存
+## V1 初版：正确，但仍是跨 sector 访存
 
 学习者实现的 V1 使用局部 max、shared-memory tree max、局部指数和、
 shared-memory tree sum，再归一化写回。所有 17 个 shape 正确性 `PASS`，
 程序退出码为 0；Compute Sanitizer memcheck 报告 `0 errors`、
 `0 bytes leaked`，退出码为 0。无元素线程分别贡献 `-∞` 和 `0`，
-各轮 barrier 均由整个 block 到达；当前代码未发现明显的同步位置错误。
+各轮 barrier 均由整个 block 到达；初版代码未发现明显的同步位置错误。
 
 同一 GPU、相同构建条件下，V0/V1 暖机后交替运行三轮，CUDA Event
 warm-up 10 次、正式迭代 100 次：
@@ -80,13 +80,49 @@ warm-up 10 次、正式迭代 100 次：
 
 学习者一次 Nsight Compute Profile：V1 `gpu__time_duration.sum=39.49 µs`，
 global-load request `49152`、sector `1572864`，仍是 `32 sector/request`；
-V0 对应为 `49152` request、`1572864` sector。当前 V1 在 `hidden=4096` 时，
+V0 对应为 `49152` request、`1572864` sector。初版 V1 在 `hidden=4096` 时，
 `cols_per_thread=16`，同一轮读取的列为 `tid×16+i`，相邻 lane 相隔
 `16×4=64` 字节，各占不同 sector。V1 的 request 数可按
 `128 block×8 warp/block×16 轮×3 遍=49152` 核对。
 
-因此当前测得的加速与“更多 block 并行、每线程串行工作更少”相符，
-但这些数据不能分离各项因素的贡献。下一步只改变列分配：让同一轮的
-相邻 lane 处理相邻列，在 max、sum、输出三个阶段保持一致；再做相同的
-Correctness → Sanitizer → Benchmark → Profile 对照。目标是亲自验证
-`sector/request` 是否下降，而非直接宣称 V1 已完成合并访存优化。
+因此初版测得的加速与“更多 block 并行、每线程串行工作更少”相符，
+但这些数据不能分离各项因素的贡献。当时待验证的问题是：保持 block
+配置与算法不变，只改变列分配，让同一轮的相邻 lane 处理相邻列，
+`sector/request` 和实际延迟会怎样变化？
+
+## V1 列映射修正版：正确性、Benchmark、Profile
+
+学习者将 max、指数和、写回三遍循环统一改为从 `tid` 起步、每轮跨
+`blockDim.x=256` 列。固定循环轮次时，warp 内相邻 lane 访问相邻 FP32
+元素；下一轮再由同一线程处理相距 256 列的元素。17 个正确性用例全部
+`PASS`，程序退出码为 0；Compute Sanitizer memcheck 为 `0 errors`、
+`0 bytes leaked`，退出码为 0。
+
+同一 GPU、同一构建配置下，V0/V1 整程序预热后交替运行三轮。下表是
+CUDA Event 的 kernel-only 延迟，warm-up 10 次、正式迭代 100 次：
+
+| 形状 | V0 三轮 latency（ms） | 修正版 V1 三轮 latency（ms） | 修正版 V1 平均（ms） |
+| --- | --- | --- | ---: |
+| `(1,128)` | 0.015221 / 0.010771 / 0.010772 | 0.002377 / 0.002378 / 0.002389 | 0.002381 |
+| `(16,512)` | 0.076347 / 0.053679 / 0.053453 | 0.002751 / 0.002765 / 0.002748 | 0.002755 |
+| `(128,1024)` | 0.440791 / 0.313692 / 0.312934 | 0.003488 / 0.003484 / 0.003503 | 0.003492 |
+| `(128,4096)` | 1.714258 / 1.252110 / 1.252638 | 0.005181 / 0.005172 / 0.005180 | 0.005178 |
+
+V0 本次每个尺寸的第一轮都明显偏高，不能直接取这三轮平均值作精确
+speedup 基线；后两轮与前述 V0 稳定基线相近。针对相同的
+`(128,4096)`，V1 初版三轮平均 `0.025122 ms`，修正版平均
+`0.005178 ms`，同配置下约快 `4.852×`，延迟降低约 `79.39%`。
+
+学习者对修正版采集的一次 Nsight Compute Profile：
+`gpu__time_duration.sum=10.94 µs`，L1/TEX global-load request 为
+`49152`、sector 为 `196608`，即 `4 sector/request`。与 V1 初版
+`49152 request`、`1572864 sector`、`32 sector/request` 相比，请求数
+不变而 sector 数降低 `87.5%`（8 倍）。这与一个 warp 连续读取
+32 个 FP32 元素覆盖 4 个对齐 32 字节 sector 相符，是本次读取侧
+coalescing 改善的直接证据。L1/TEX sector 不等于实际 DRAM 传输量。
+
+本次列映射还改变了写回的地址分布，并可能改变编译后指令路径；不能把
+全部 `4.852×` 加速仅归因于 global load sector 减少。Profile 条件下的
+`10.94 µs` 也不应与正常 Event 的 `0.005178 ms` 混作同一计时口径。
+至此 V1 的 Reference、Correctness、Benchmark、Profile、Optimization、
+Re-benchmark 和 Notes 已闭环；下一版按计划由学习者实现 V2 Warp Shuffle。

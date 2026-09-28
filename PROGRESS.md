@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 9 — V1 正确性与首次性能测试完成；待修正线程到列的映射并复测
+Day 9 — V1 Shared Memory Softmax 已完成访存映射优化与验收；下一步 V2 Warp Shuffle
 
 ## 已完成
 
@@ -248,13 +248,21 @@ Day 9 — V1 正确性与首次性能测试完成；待修正线程到列的映�
   `66.570×`。详细原始数值已记录在 `07_softmax/README.md`。
 - V1 的 Nsight Compute Profile 为 `39.49 µs`、global-load request
   `49152`、sector `1572864`，与 V0 相同，均为 `32 sector/request`。
-  当前性能收益不能归因于访存合并；V1 还需针对列映射做单变量修正和复测。
+  初版性能收益不能归因于访存合并；随后已针对列映射复测。
+- 学习者已将 V1 三遍循环统一改为 `i=tid; i<hidden; i+=256`。
+  修正版 17 个正确性用例全部 PASS、退出码 0；memcheck 为
+  0 errors、0 bytes leaked，退出码 0。
+- 修正版 V1 三轮 CUDA Event Benchmark 中 `(128,4096)` 平均 latency
+  `0.005178 ms`，相对初版的 `0.025122 ms` 约快 `4.852×`；
+  Nsight Compute global-load request 仍为 `49152`，sector 从
+  `1572864` 降至 `196608`，即 `32→4 sector/request`。读取侧
+  coalescing 改善得到 Profile 支持。V1 性能闭环验收完成。
 
 ## 当前任务
 
-- 学习者独立修改 V1 的列映射，使同一轮的相邻 lane 访问相邻列；
-  max、sum 与输出三个阶段一致，再运行正确性、Sanitizer、三轮 Benchmark
-  和一次 Nsight Compute Profile，与当前 V1 的 32 sector/request 对照。
+- 下一步按计划准备 V2 Warp Shuffle Softmax：继续由学习者实现核心
+  warp/block 规约，沿用现有正确性、Sanitizer、Benchmark 和 Profile
+  方法；此阶段不预先扩展到 V3。
 
 ## 当前问题
 
@@ -263,8 +271,10 @@ Day 9 — V1 正确性与首次性能测试完成；待修正线程到列的映�
   构建对照，须在新配置下重新采集，不能混用两种构建的数值。
 - V0 的三个 Profile 指标能证明 load 访问高度分散，但不能单独量化 DRAM
   实际传输量，或分离不合并访存、低并行度与指数运算的耗时贡献。
-- V1 当前的 `tid×cols_per_thread+i` 让同一轮相邻 lane 相隔 64 字节，
-  所以 Profile 仍为 32 sector/request；并未达到预期的合并访存。
+- 本轮交替测量中，V0 每个尺寸的第一轮明显高于后两轮，不能直接用
+  全部三轮均值作修正版 V1 的精确速度比基线。
+- V1 列映射同时改变 global load 和 store 的线程地址分布；现有指标
+  能证明 load sector/request 降低，不能单独量化 load 对全部加速的贡献。
 
 ## 今日关键知识
 
@@ -368,13 +378,18 @@ Day 9 — V1 正确性与首次性能测试完成；待修正线程到列的映�
   不同 sector。3 遍输入读取对应 `4×4096×3=49152` 个 load request，
   实测 `1572864/49152=32 sector/request`；这是 L1/TEX 计数，不是 DRAM
   读量。单线程跨列连续读取是时间上的局部性，不是同一 warp 指令的合并访存。
-- 一个线程负责连续 16 列，不代表 warp 读取连续：V1 当前同一轮相邻 lane
+- 一个线程负责连续 16 列，不代表 warp 读取连续：V1 初版同一轮相邻 lane
   分别访问第 0、16、32…列，`hidden=4096` 时地址间距 64 字节，
   与 V0 一样触及 32 个 sector。大幅加速可由行内/跨 block 并行解释，
-  不能用“V1 合并访存已改善”解释；下一次只改线程到列的映射验证假设。
+  不能用“初版 V1 合并访存已改善”解释。
+- V1 修正版让同一轮的相邻 lane 负责相邻列，每线程下一轮跨 256 列。
+  `(128,4096)` 的 L1/TEX global-load `sector/request` 从 32 降到 4，
+  与连续读取 32 个 FP32 元素覆盖 4 个 32 字节 sector 相符；
+  三轮 Event 平均延迟从 `0.025122 ms` 降到 `0.005178 ms`。
+- Profile 的 `10.94 µs` 是 ncu 条件下的时长，正常运行的 Event
+  `0.005178 ms` 才用于同口径 Benchmark；不同工具的绝对时长不直接混比。
 
 ## 下一任务
 
-- 学习者保持 V1 其余算法不变，只修改列映射并亲自复测；提交修正后的
-  正确性、Sanitizer、三轮 Benchmark、Profile 原始输出及自己的解释。
-  访存优化有证据后，再讨论 V2 Warp Shuffle。
+- 准备 V2 Warp Shuffle 的中文任务框架，核心 kernel 仍留给学习者实现；
+  V2 完成后用同尺寸、同配置的 V1/V2 Benchmark 与 Profile 对照。

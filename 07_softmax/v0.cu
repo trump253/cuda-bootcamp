@@ -4,10 +4,28 @@
 __global__ void softmax_v0_kernel(const float* input, float* output,
                                   int rows, int hidden) {
     // TODO 1：用 blockIdx.x、blockDim.x、threadIdx.x 求出负责的行号。
+    int row = blockDim.x * blockIdx.x + threadIdx.x;
     // TODO 2：检查行号是否越界；每行元素在 row-major 内存中连续存放。
     // TODO 3：先求这一行的最大值，再累加 exp(x - max) 得到分母。
     // TODO 4：计算每个输出的 exp(x - max) / 分母。
     // 注意：V0 允许多遍读取同一行；暂时不要加 shared memory 或 shuffle。
+    if (row < rows) {
+        const float* input_row = input + row * hidden;
+        float* output_row = output + row *hidden;
+
+        float row_max = -INFINITY;
+        for (int i = 0; i < hidden; i++) row_max = fmaxf(row_max, input_row[i]);
+
+        float row_sum = 0.0f;
+        for (int i = 0; i < hidden; i++) {
+            row_sum += expf(input_row[i] - row_max);
+        }
+
+        float inv_sum = 1.0f / row_sum;
+        for (int i = 0; i < hidden; i++) {
+            output_row[i] = expf(input_row[i] - row_max) * inv_sum;
+        }
+    }
 }
 
 int main(int argc, char** argv) {

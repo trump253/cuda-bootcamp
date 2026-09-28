@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 9 — Softmax V0 基线已验收；V1 Shared Memory 框架已准备
+Day 9 — V1 正确性与首次性能测试完成；待修正线程到列的映射并复测
 
 ## 已完成
 
@@ -241,12 +241,20 @@ Day 9 — Softmax V0 基线已验收；V1 Shared Memory 框架已准备
   256 线程，预置 max/sum shared 数组和与 V0 共用的正确性、Benchmark、
   单次 Profile 入口；block 内两次规约和写回仍由学习者实现。当前空 kernel
   编译通过，未使用变量警告和正确性 `FAIL`（退出码 1）符合模板预期。
+- 学习者已实现 V1 的两次 shared-memory tree 规约和归一化。17 个 shape
+  正确性全部 PASS、退出码 0；memcheck 为 0 errors、0 bytes leaked。
+- V0/V1 交替三轮 Benchmark：`(128,4096)` 的平均 latency 为
+  `1.253107/0.025122 ms`，V1 约快 `49.882×`；`(128,1024)` 约快
+  `66.570×`。详细原始数值已记录在 `07_softmax/README.md`。
+- V1 的 Nsight Compute Profile 为 `39.49 µs`、global-load request
+  `49152`、sector `1572864`，与 V0 相同，均为 `32 sector/request`。
+  当前性能收益不能归因于访存合并；V1 还需针对列映射做单变量修正和复测。
 
 ## 当前任务
 
-- 学习者完成 Day 9 V1 的局部 max、shared tree max、局部指数和、
-  shared tree sum 与归一化写回；依次完成正确性、Sanitizer、三轮 V0/V1
-  Benchmark 和 Nsight Compute 对照。
+- 学习者独立修改 V1 的列映射，使同一轮的相邻 lane 访问相邻列；
+  max、sum 与输出三个阶段一致，再运行正确性、Sanitizer、三轮 Benchmark
+  和一次 Nsight Compute Profile，与当前 V1 的 32 sector/request 对照。
 
 ## 当前问题
 
@@ -255,7 +263,8 @@ Day 9 — Softmax V0 基线已验收；V1 Shared Memory 框架已准备
   构建对照，须在新配置下重新采集，不能混用两种构建的数值。
 - V0 的三个 Profile 指标能证明 load 访问高度分散，但不能单独量化 DRAM
   实际传输量，或分离不合并访存、低并行度与指数运算的耗时贡献。
-- V1 当前只有可编译的空 kernel 模板，尚无正确性或性能结果。
+- V1 当前的 `tid×cols_per_thread+i` 让同一轮相邻 lane 相隔 64 字节，
+  所以 Profile 仍为 32 sector/request；并未达到预期的合并访存。
 
 ## 今日关键知识
 
@@ -359,9 +368,13 @@ Day 9 — Softmax V0 基线已验收；V1 Shared Memory 框架已准备
   不同 sector。3 遍输入读取对应 `4×4096×3=49152` 个 load request，
   实测 `1572864/49152=32 sector/request`；这是 L1/TEX 计数，不是 DRAM
   读量。单线程跨列连续读取是时间上的局部性，不是同一 warp 指令的合并访存。
+- 一个线程负责连续 16 列，不代表 warp 读取连续：V1 当前同一轮相邻 lane
+  分别访问第 0、16、32…列，`hidden=4096` 时地址间距 64 字节，
+  与 V0 一样触及 32 个 sector。大幅加速可由行内/跨 block 并行解释，
+  不能用“V1 合并访存已改善”解释；下一次只改线程到列的映射验证假设。
 
 ## 下一任务
 
-- 学习者阅读 `07_softmax/DAY9_V1_TASK.md` 后实现 `v1.cu` 的 TODO；
-  先用共用 harness 检查正确性与同步，再自行采集 Benchmark/Profile，
-  以 V0 为基线验证 V1 是否确有收益。
+- 学习者保持 V1 其余算法不变，只修改列映射并亲自复测；提交修正后的
+  正确性、Sanitizer、三轮 Benchmark、Profile 原始输出及自己的解释。
+  访存优化有证据后，再讨论 V2 Warp Shuffle。

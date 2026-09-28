@@ -8,14 +8,13 @@ V3 合理向量化；每版都要有正确性、Benchmark 与必要的 Profile �
 ## 当前文件
 
 - `v0.cu`：学习者已实现 V0 逐行串行 GPU kernel；目前保留了原模板的 TODO 注释。
-- `v1.cu`：每行一个 block 的 Shared Memory V1，核心规约留给学习者实现。
+- `v1.cu`：学习者已实现每行一个 block 的 Shared Memory max/sum 规约。
 - `softmax_harness.h`：共用的确定性输入、CPU Reference、GPU 正确性校验、
   CUDA Event Benchmark 和单次 kernel Profile 入口；不用重新写测试样板。
 - `DAY9_V0_TASK.md`：已完成的 V0 任务说明。
 - `DAY9_V1_TASK.md`：当前 V1 任务、验收标准和提交内容。
 
-V1 目前只是可编译模板：未使用变量警告及正确性测试 `FAIL` 均因 kernel
-尚未填写，不能视为 V1 的验收结果。
+V1 的正确性和首次 Benchmark/Profile 已完成；访存映射仍待一次针对性对照。
 
 ## 计时口径
 
@@ -56,3 +55,38 @@ L1/TEX global-load sector `1572864`，即 `32 sector/request`。这与源码的
 
 V0 的正确性、Benchmark、Profile 和基线 Notes 已验收；Day 9 尚未结束。
 V1 由学习者实现后，要在相同 shape、GPU 和构建条件下与此基线对照。
+
+## V1 当前实现：正确，但仍是跨 sector 访存
+
+学习者实现的 V1 使用局部 max、shared-memory tree max、局部指数和、
+shared-memory tree sum，再归一化写回。所有 17 个 shape 正确性 `PASS`，
+程序退出码为 0；Compute Sanitizer memcheck 报告 `0 errors`、
+`0 bytes leaked`，退出码为 0。无元素线程分别贡献 `-∞` 和 `0`，
+各轮 barrier 均由整个 block 到达；当前代码未发现明显的同步位置错误。
+
+同一 GPU、相同构建条件下，V0/V1 暖机后交替运行三轮，CUDA Event
+warm-up 10 次、正式迭代 100 次：
+
+| 形状 | V0 三轮 latency（ms） | V1 三轮 latency（ms） | V0/V1 平均延迟比 |
+| --- | --- | --- | ---: |
+| `(1,128)` | 0.010753 / 0.010739 / 0.010766 | 0.004117 / 0.002638 / 0.002744 | 3.396× |
+| `(16,512)` | 0.053456 / 0.053504 / 0.053334 | 0.003975 / 0.002704 / 0.002683 | 17.122× |
+| `(128,1024)` | 0.313569 / 0.312996 / 0.313401 | 0.004653 / 0.004670 / 0.004797 | 66.570× |
+| `(128,4096)` | 1.253339 / 1.253089 / 1.252894 | 0.025068 / 0.025168 / 0.025129 | 49.882× |
+
+前两种较短形状的 V1 首轮偏高，不宜用其单轮数值下结论；大形状的
+三轮结果较稳定。`(128,4096)` 的延迟显著下降，证明当前 V1 有性能收益，
+但不能把加速归因于合并访存。
+
+学习者一次 Nsight Compute Profile：V1 `gpu__time_duration.sum=39.49 µs`，
+global-load request `49152`、sector `1572864`，仍是 `32 sector/request`；
+V0 对应为 `49152` request、`1572864` sector。当前 V1 在 `hidden=4096` 时，
+`cols_per_thread=16`，同一轮读取的列为 `tid×16+i`，相邻 lane 相隔
+`16×4=64` 字节，各占不同 sector。V1 的 request 数可按
+`128 block×8 warp/block×16 轮×3 遍=49152` 核对。
+
+因此当前测得的加速与“更多 block 并行、每线程串行工作更少”相符，
+但这些数据不能分离各项因素的贡献。下一步只改变列分配：让同一轮的
+相邻 lane 处理相邻列，在 max、sum、输出三个阶段保持一致；再做相同的
+Correctness → Sanitizer → Benchmark → Profile 对照。目标是亲自验证
+`sector/request` 是否下降，而非直接宣称 V1 已完成合并访存优化。

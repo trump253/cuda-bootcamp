@@ -634,3 +634,23 @@ request 32 sector，得到 `1572864`，与学习者 Profile 完全一致。
 4096 列及两遍 `expf` 也是可能的耗时因素。仅凭这三个指标不能断言 V0
 单纯是 DRAM 带宽瓶颈，或量化每种因素的贡献。
 sector 与 request 的定义见 [NVIDIA Nsight Compute Profiling Guide](https://docs.nvidia.com/nsight-compute/ProfilingGuide/)。
+
+### 为什么 V1 快了约 49.9 倍，global-load 仍是 32 sector/request？
+
+`(128,4096)` 的 V1 一行一个 block、每 block 256 线程，故每线程处理
+`ceil(4096/256)=16` 列。当前列映射是 `tid×16+i`：对固定的循环轮次 `i`，
+同一 warp 的 lane 0/1/2 分别读取第 0/16/32 列，地址间隔 64 字节，
+所以 32 个 lane 各触及不同 sector。它只保证单个线程在时间上依次读取
+连续数据，不保证同一条 warp load 指令的合并访存。
+
+学习者 Profile 的 V1 global-load request 为 49152、sector 为 1572864，
+`sector/request=32`，与 V0 完全相同；这支持上述地址分析。三轮 CUDA Event
+Benchmark 中，`(128,4096)` V0/V1 平均为 `1.253107/0.025122 ms`，
+延迟比约 `49.882×`。因此 V1 的确更快，但**不能**将该收益归因于已改善
+的合并访存；V1 的更多 block 并行、每线程更短的串行循环等因素同时变化，
+目前尚未量化各因素的独立贡献。
+
+下一次只调整线程到列的映射，让相邻 lane 在同一轮访问相邻列，并在
+求 max、指数和、写输出三遍中保持一致；再以正确性、Benchmark 和
+`sector/request` 验证，而不是仅凭地址推断性能。NVIDIA 对
+`sector/request` 的说明见 [Nsight Compute Profiling Guide](https://docs.nvidia.com/nsight-compute/ProfilingGuide/)。

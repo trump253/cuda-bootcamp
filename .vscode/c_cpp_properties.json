@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/usr/local/cuda/include",
+                "/usr/local/cuda-11.8/include",
+                "/usr/local/cuda-11.8/targets/x86_64-linux/include"
+            ],
+            "defines": [
+                "__CUDACC__"
+            ],
+            "compilerPath": "/usr/bin/g++",
+            "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-gcc-x64"
+        }
+    ],
+    "version": 4
+}

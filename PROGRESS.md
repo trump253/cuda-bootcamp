@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 9 — 学习者已填写 Softmax V0 逐行朴素 kernel；待正确性与性能验收
+Day 9 — Softmax V0 基线已验收；下一阶段为 V1 Shared Memory
 
 ## 已完成
 
@@ -230,20 +230,26 @@ Day 9 — 学习者已填写 Softmax V0 逐行朴素 kernel；待正确性与性
 - 已为本工程准备本地 Git 仓库；构建目录、独立 CMake 临时目录及 Nsight
   报告文件由 `.gitignore` 排除。首次本地提交已完成；未配置远端，未 push。
 - 学习者已在 `07_softmax/v0.cu` 填写一线程一行的 V0 算法，包括求最大值、
-  指数求和与归一化；当前尚未提交正确性、Sanitizer、Benchmark 或 Profile
-  输出，不能据此判定 V0 已验收。
+  指数求和与归一化。17 个正确性用例全部 PASS，程序退出码为 0；Compute
+  Sanitizer 报告 0 errors、0 bytes leaked，退出码为 0。
+- 学习者完成 V0 三轮 CUDA Event Benchmark：`(128,4096)` 平均
+  `1.250821 ms`。Nsight Compute 单次 Profile 为 `1.77 ms`，L1/TEX
+  global-load request `49152`、sector `1572864`；原始数据和分析已记录在
+  `07_softmax/README.md`。V0 基线的正确性、Benchmark、Profile 与 Notes
+  已验收，不代表 Day 9 最终验收。
 
 ## 当前任务
 
-- 学习者先验证 Day 9 Softmax V0 的正确性与 Sanitizer，再提交三轮 CUDA
-  Event Benchmark 和首次 Profile 输出供 Review。
+- 按计划准备 Day 9 V1 Shared Memory Softmax：一行由 block 内多个线程协作，
+  先设计 max/sum 两次规约，再用相同测试框架与 V0 做对照。
 
 ## 当前问题
 
 - Day 1 的 GPU/CPU 索引变量类型尚未完全统一为 `std::size_t`。
 - Day 8 的 `N=1024` 短 kernel 多轮结果有明显波动；若以后需要与 Release
   构建对照，须在新配置下重新采集，不能混用两种构建的数值。
-- Day 9 V0 的 GPU kernel 已由学习者填写，但尚无正确性和性能数据。
+- V0 的三个 Profile 指标能证明 load 访问高度分散，但不能单独量化 DRAM
+  实际传输量，或分离不合并访存、低并行度与指数运算的耗时贡献。
 
 ## 今日关键知识
 
@@ -342,9 +348,13 @@ Day 9 — 学习者已填写 Softmax V0 逐行朴素 kernel；待正确性与性
   `std::max` 与 `std::exp(double)` 则在主机端执行；函数名不等于性能证据。
 - V0 不必为了“使用 CUDA 函数”替换现有 `max`、`exp`；如需明确 FP32
   类型意图，可写 `fmaxf`、`expf`，但这不是已验证的加速，仍需先完成测试。
+- V0 在 `(128,4096)` 使用 1 个 block、4 个 warp，每 warp 的相邻线程负责
+  相邻行；同一列的 load 地址相隔 16384 字节，所以一次请求覆盖 32 个
+  不同 sector。3 遍输入读取对应 `4×4096×3=49152` 个 load request，
+  实测 `1572864/49152=32 sector/request`；这是 L1/TEX 计数，不是 DRAM
+  读量。单线程跨列连续读取是时间上的局部性，不是同一 warp 指令的合并访存。
 
 ## 下一任务
 
-- 学习者先用 `--correctness-only` 与 Compute Sanitizer 检查已填写的 V0，
-  再提交三轮 Benchmark 与 Profile 证据。
-  V0 经 Review 后才准备 V1 Shared Memory 任务模板。
+- 准备 V1 Shared Memory 行内并行规约任务模板；保持学习者实现 kernel 的
+  导师方式，使用 V0 的同形状 Benchmark 与 Profile 作为优化基线。

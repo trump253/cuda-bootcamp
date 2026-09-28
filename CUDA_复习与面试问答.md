@@ -606,7 +606,7 @@ CUDA 11.8 提供设备端的 `max(float, float)` 重载，其行为等价于 `fm
 作为对照，`softmax_harness.h` 的 CPU Reference 显式使用 `std::max`、
 `std::exp`，且将输入转为 `double`，它们在主机端执行。若希望 GPU 源码的
 精度意图更明显，可以显式使用 `fmaxf`、`expf`；不要把它们误认为会把数据
-传回 CPU 的函数调用。本节尚未取得 V0 性能数据，不能由函数名判断瓶颈。
+传回 CPU 的函数调用。仅凭函数名不能判断瓶颈，需结合实测。
 对应函数定义可查 [CUDA 11.8 Math API](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-math-api/group__CUDA__MATH__SINGLE.html)。
 
 ### V0 有必要把 `max`、`exp` 改成 CUDA 函数吗？用哪个？
@@ -614,5 +614,23 @@ CUDA 11.8 提供设备端的 `max(float, float)` 重载，其行为等价于 `fm
 当前未限定命名空间的 `max(float,float)`、`exp(float)` 已在 GPU 端执行，
 不必为了“改成 CUDA 函数”而替换。若想明确限定本版的 FP32 意图，可分别
 使用 `fmaxf`、`expf`；这属于可读性和类型选择，不是已经证明的性能优化。
-V0 先固定一种写法，完成正确性、Benchmark 和 Profile，再考虑函数实现或
-近似版本的对照；不能仅凭名字推断更快。
+V0 应先固定一种写法，完成正确性、Benchmark 和 Profile，再考虑函数实现或
+近似版本的对照；不能仅凭名字推断更快。当前 V0 基线已完成这三项实测。
+
+### Softmax V0 为什么是 32 sector/request？三遍读取都来自 DRAM 吗？
+
+`(rows,hidden)=(128,4096)` 时，V0 每线程负责一行，共 1 个 block、4 个
+warp。对同一条读取指令和同一个列索引 `i`，warp 内相邻 lane 对应相邻行，
+地址相隔 `hidden×sizeof(float)=4096×4=16384` 字节；32 个 lane 各自触及
+一个不同的 32 字节 sector。因此一次 warp load request 涉及 32 个 sector，
+而连续读取 32 个 FP32 元素的理想情况是 4 个 sector。单个线程下一轮读取
+本行的相邻元素属于时间局部性，不会改变当前 warp 指令的合并情况。
+
+源码有三遍输入读取（求 max、求指数和、写归一化结果），实测
+`4 warp × 4096 列 × 3 遍=49152` 个 L1/TEX global-load request，乘以每
+request 32 sector，得到 `1572864`，与学习者 Profile 完全一致。
+这些计数表明三遍都发出了 global-load 请求，但不能证明每次都从 DRAM
+取回；缓存命中也会在 L1/TEX 层被计数。V0 的 `grid=1`、每线程串行处理
+4096 列及两遍 `expf` 也是可能的耗时因素。仅凭这三个指标不能断言 V0
+单纯是 DRAM 带宽瓶颈，或量化每种因素的贡献。
+sector 与 request 的定义见 [NVIDIA Nsight Compute Profiling Guide](https://docs.nvidia.com/nsight-compute/ProfilingGuide/)。

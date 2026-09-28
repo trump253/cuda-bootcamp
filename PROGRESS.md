@@ -340,6 +340,8 @@ Day 9 — 学习者已填写 Softmax V0 逐行朴素 kernel；待正确性与性
 - 当前 V0 的 `max(float,float)` 是 CUDA 设备端数学重载，行为对应 `fmaxf`；
   `exp(float)` 也在设备端执行，可显式写为 `expf`。CPU Reference 中的
   `std::max` 与 `std::exp(double)` 则在主机端执行；函数名不等于性能证据。
+- V0 不必为了“使用 CUDA 函数”替换现有 `max`、`exp`；如需明确 FP32
+  类型意图，可写 `fmaxf`、`expf`，但这不是已验证的加速，仍需先完成测试。
 
 ## 下一任务
 

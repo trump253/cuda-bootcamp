@@ -608,3 +608,11 @@ CUDA 11.8 提供设备端的 `max(float, float)` 重载，其行为等价于 `fm
 精度意图更明显，可以显式使用 `fmaxf`、`expf`；不要把它们误认为会把数据
 传回 CPU 的函数调用。本节尚未取得 V0 性能数据，不能由函数名判断瓶颈。
 对应函数定义可查 [CUDA 11.8 Math API](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-math-api/group__CUDA__MATH__SINGLE.html)。
+
+### V0 有必要把 `max`、`exp` 改成 CUDA 函数吗？用哪个？
+
+当前未限定命名空间的 `max(float,float)`、`exp(float)` 已在 GPU 端执行，
+不必为了“改成 CUDA 函数”而替换。若想明确限定本版的 FP32 意图，可分别
+使用 `fmaxf`、`expf`；这属于可读性和类型选择，不是已经证明的性能优化。
+V0 先固定一种写法，完成正确性、Benchmark 和 Profile，再考虑函数实现或
+近似版本的对照；不能仅凭名字推断更快。

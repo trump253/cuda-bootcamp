@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 9 — Softmax V0 基线已验收；下一阶段为 V1 Shared Memory
+Day 9 — Softmax V0 基线已验收；V1 Shared Memory 框架已准备
 
 ## 已完成
 
@@ -237,11 +237,16 @@ Day 9 — Softmax V0 基线已验收；下一阶段为 V1 Shared Memory
   global-load request `49152`、sector `1572864`；原始数据和分析已记录在
   `07_softmax/README.md`。V0 基线的正确性、Benchmark、Profile 与 Notes
   已验收，不代表 Day 9 最终验收。
+- 已创建可编译的 V1 Shared Memory Softmax 框架：每行一个 block、每 block
+  256 线程，预置 max/sum shared 数组和与 V0 共用的正确性、Benchmark、
+  单次 Profile 入口；block 内两次规约和写回仍由学习者实现。当前空 kernel
+  编译通过，未使用变量警告和正确性 `FAIL`（退出码 1）符合模板预期。
 
 ## 当前任务
 
-- 按计划准备 Day 9 V1 Shared Memory Softmax：一行由 block 内多个线程协作，
-  先设计 max/sum 两次规约，再用相同测试框架与 V0 做对照。
+- 学习者完成 Day 9 V1 的局部 max、shared tree max、局部指数和、
+  shared tree sum 与归一化写回；依次完成正确性、Sanitizer、三轮 V0/V1
+  Benchmark 和 Nsight Compute 对照。
 
 ## 当前问题
 
@@ -250,6 +255,7 @@ Day 9 — Softmax V0 基线已验收；下一阶段为 V1 Shared Memory
   构建对照，须在新配置下重新采集，不能混用两种构建的数值。
 - V0 的三个 Profile 指标能证明 load 访问高度分散，但不能单独量化 DRAM
   实际传输量，或分离不合并访存、低并行度与指数运算的耗时贡献。
+- V1 当前只有可编译的空 kernel 模板，尚无正确性或性能结果。
 
 ## 今日关键知识
 
@@ -356,5 +362,6 @@ Day 9 — Softmax V0 基线已验收；下一阶段为 V1 Shared Memory
 
 ## 下一任务
 
-- 准备 V1 Shared Memory 行内并行规约任务模板；保持学习者实现 kernel 的
-  导师方式，使用 V0 的同形状 Benchmark 与 Profile 作为优化基线。
+- 学习者阅读 `07_softmax/DAY9_V1_TASK.md` 后实现 `v1.cu` 的 TODO；
+  先用共用 harness 检查正确性与同步，再自行采集 Benchmark/Profile，
+  以 V0 为基线验证 V1 是否确有收益。

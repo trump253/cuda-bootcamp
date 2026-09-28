@@ -73,6 +73,9 @@ endfunction()
 # add_executable(vector_add_half2 06_fp16_half2/half2.cu)
 # target_include_directories(vector_add_half2 PRIVATE common 06_fp16_half2)
 
-# Day 9 V0：测试框架已准备，逐行 Softmax kernel 由学习者完成。
+# Day 9：保留 V0 基线；V1 的 shared-memory kernel 由学习者完成。
 add_executable(softmax_v0 07_softmax/v0.cu)
 target_include_directories(softmax_v0 PRIVATE common 07_softmax)
+
+add_executable(softmax_v1 07_softmax/v1.cu)
+target_include_directories(softmax_v1 PRIVATE common 07_softmax)

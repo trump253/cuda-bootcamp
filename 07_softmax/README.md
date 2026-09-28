@@ -3,14 +3,19 @@
 本节输入、输出均为行主序 FP32 矩阵，形状 `[rows, hidden]`。每一行独立执行
 Softmax。按计划依次完成 V0 逐行朴素版、V1 Shared Memory、V2 Warp Shuffle、
 V3 合理向量化；每版都要有正确性、Benchmark 与必要的 Profile 证据，不能只凭
-源码推断加速。目前仅开放 V0，后续版本在 V0 经 Review 后逐步准备。
+源码推断加速。V0 基线已验收，现在开放 V1；V2/V3 暂不提前实现。
 
 ## 当前文件
 
 - `v0.cu`：学习者已实现 V0 逐行串行 GPU kernel；目前保留了原模板的 TODO 注释。
+- `v1.cu`：每行一个 block 的 Shared Memory V1，核心规约留给学习者实现。
 - `softmax_harness.h`：共用的确定性输入、CPU Reference、GPU 正确性校验、
   CUDA Event Benchmark 和单次 kernel Profile 入口；不用重新写测试样板。
-- `DAY9_V0_TASK.md`：当前任务、验收标准和需要提交的结果。
+- `DAY9_V0_TASK.md`：已完成的 V0 任务说明。
+- `DAY9_V1_TASK.md`：当前 V1 任务、验收标准和提交内容。
+
+V1 目前只是可编译模板：未使用变量警告及正确性测试 `FAIL` 均因 kernel
+尚未填写，不能视为 V1 的验收结果。
 
 ## 计时口径
 
@@ -49,5 +54,5 @@ L1/TEX global-load sector `1572864`，即 `32 sector/request`。这与源码的
 指标不足以分离不合并访存、有限并行度与指数运算各自的耗时贡献。ncu 的
 `1.77 ms` 是 Profile 条件下的耗时，不与正常 Event 的 `1.250821 ms` 混比。
 
-V0 的正确性、Benchmark、Profile 和基线 Notes 已验收；Day 9 尚未结束，
-下一版按计划为 V1 Shared Memory 行内并行规约。
+V0 的正确性、Benchmark、Profile 和基线 Notes 已验收；Day 9 尚未结束。
+V1 由学习者实现后，要在相同 shape、GPU 和构建条件下与此基线对照。

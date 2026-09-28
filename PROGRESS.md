@@ -228,7 +228,7 @@ Day 9 — V1 基线已恢复，V2 Warp Shuffle 任务框架已建立，待学习
   编译通过。空 kernel 的正确性测试按预期全部 FAIL 并以退出码 1 返回，
   不是 Day 9 正确性验收结果。
 - 已为本工程准备本地 Git 仓库；构建目录、独立 CMake 临时目录及 Nsight
-  报告文件由 `.gitignore` 排除。首次本地提交已完成；未配置远端，未 push。
+  报告文件由 `.gitignore` 排除。首次本地提交已完成。
 - 学习者已在 `07_softmax/v0.cu` 填写一线程一行的 V0 算法，包括求最大值、
   指数求和与归一化。17 个正确性用例全部 PASS，程序退出码为 0；Compute
   Sanitizer 报告 0 errors、0 bytes leaked，退出码为 0。
@@ -276,6 +276,10 @@ Day 9 — V1 基线已恢复，V2 Warp Shuffle 任务框架已建立，待学习
   V1 重新运行 17 个 shape 全部 PASS、退出码 0。空 V2 模板的
   17 个 shape 均按预期 FAIL、退出码 1；未使用的 partial/shared
   变量产生编译 warning，完成 TODO 后应消失。
+- 已将已验收的 V0/V1 学习者源码单独提交，并把本地 `main` 推送到
+  `github.com/trump253/cuda-bootcamp` 的 `main`。`origin` 拉取使用
+  HTTPS、推送使用已认证的 SSH；用户已明确要求后续每次本地提交后
+  自动推送。仍只提交当前任务范围内的文件，不顺手纳入其他工作区改动。
 
 ## 当前任务
 

@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 9 — V1 Shared Memory Softmax 已完成访存映射优化与验收；下一步 V2 Warp Shuffle
+Day 9 — V1 已验收；额外的 output 暂存实验出现性能回退，下一步 V2 Warp Shuffle
 
 ## 已完成
 
@@ -257,12 +257,20 @@ Day 9 — V1 Shared Memory Softmax 已完成访存映射优化与验收；下一
   Nsight Compute global-load request 仍为 `49152`，sector 从
   `1572864` 降至 `196608`，即 `32→4 sector/request`。读取侧
   coalescing 改善得到 Profile 支持。V1 性能闭环验收完成。
+- 学习者补充尝试在求和阶段把 `expf(x-max)` 暂存到 `output`，归一化
+  阶段读回，以额外一次 output 写入换取源码层面少一次 `expf`。
+  17 个正确性用例全部 PASS；本次未提供该变体的 Sanitizer 输出。
+- 暂存变体三轮 Event Benchmark 中 `(128,4096)` 平均 `0.009092 ms`，
+  相对已验收 V1 基线的 `0.005178 ms` 延迟增加约 `75.6%`；其余三个
+  测试形状也均回退。global-load request/sector 仍为 `49152/196608`；
+  这次优化没有带来性能收益，详细对照已记入 `07_softmax/README.md`。
 
 ## 当前任务
 
 - 下一步按计划准备 V2 Warp Shuffle Softmax：继续由学习者实现核心
   warp/block 规约，沿用现有正确性、Sanitizer、Benchmark 和 Profile
-  方法；此阶段不预先扩展到 V3。
+  方法；此阶段不预先扩展到 V3。V1/V2 对比应使用已验收的直接重算
+  `expf` 基线，而非当前工作树中的较慢暂存变体。
 
 ## 当前问题
 
@@ -275,6 +283,9 @@ Day 9 — V1 Shared Memory Softmax 已完成访存映射优化与验收；下一
   全部三轮均值作修正版 V1 的精确速度比基线。
 - V1 列映射同时改变 global load 和 store 的线程地址分布；现有指标
   能证明 load sector/request 降低，不能单独量化 load 对全部加速的贡献。
+- 暂存 `expf` 变体尚缺 Compute Sanitizer 复验，以及 output store
+  与缓存路径的 Profile；目前足以判断没有观测到收益，但不足以确定
+  唯一的性能回退原因。
 
 ## 今日关键知识
 
@@ -388,8 +399,17 @@ Day 9 — V1 Shared Memory Softmax 已完成访存映射优化与验收；下一
   三轮 Event 平均延迟从 `0.025122 ms` 降到 `0.005178 ms`。
 - Profile 的 `10.94 µs` 是 ncu 条件下的时长，正常运行的 Event
   `0.005178 ms` 才用于同口径 Benchmark；不同工具的绝对时长不直接混比。
+- V1 的局部值写入 shared 后需要 barrier，保证所有线程完成初始化；
+  tree 每轮末的 barrier 保证本轮写入对下一轮读取可见。max 与 sum
+  两次规约均遵循此规则。barrier 不是错误检查，也不跨 block 同步。
+- 把指数结果写到 output 再读回没有减少总 global-load 次数：
+  直接重算版每元素 3 load + 1 store + 2 次源码 `expf`，暂存版
+  3 load + 2 store + 1 次源码 `expf`。实测后者更慢，说明少算一次
+  昂贵函数不自动等于整个 kernel 更快。
 
 ## 下一任务
 
-- 准备 V2 Warp Shuffle 的中文任务框架，核心 kernel 仍留给学习者实现；
-  V2 完成后用同尺寸、同配置的 V1/V2 Benchmark 与 Profile 对照。
+- 若要继续确认暂存变体的性能回退原因，由学习者补跑 Sanitizer，
+  在同一轮中交替测量直接重算/暂存两版，并采集 global-store 指标。
+  随后保留已验收的 V1 基线，准备 V2 Warp Shuffle 中文任务框架；
+  核心 kernel 仍由学习者实现。

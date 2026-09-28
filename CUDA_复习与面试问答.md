@@ -671,3 +671,31 @@ CUDA Event 的 V1 延迟均值从 `0.025122 ms` 降到 `0.005178 ms`，
 `4.852×` 加速只归因于 global load sector 减少。sector 也不是实际
 DRAM 读取量，ncu 的 `10.94 µs` 不与正常 Event 绝对时长混比。
 本轮 V0 的第一轮延迟异常偏高，跨版本比较时不要机械地取该三轮均值。
+
+### V1 的 `__syncthreads()` 分别保护什么？
+
+每个线程先独立扫描自己负责的列，然后把局部 max 写入 `shared_max[tid]`；
+第一次 barrier 保证整个 block 的局部值已经写好，其他线程才能开始读取
+`shared_max[tid+stride]`。在 tree 的每一轮中，活跃线程更新一部分
+shared 值；轮末 barrier 保证本轮写入对下一轮读取可见。特别是最后
+`stride=1` 后也要让所有线程看到 `shared_max[0]` 的最终值。
+
+指数和的 `shared_sum` 初始化及每轮 tree reduction 遵循同一规则。
+`__syncthreads()` 只同步同一 block 的线程并建立这些访问的顺序，
+不是数值正确性的自动检查；不能让部分线程在 barrier 前提前返回。
+当前暂存实验里，写入和读回同一个 `output` 元素的是同一线程，
+不需要为这对访问额外增设 block barrier。参见
+[NVIDIA CUDA Programming Guide 的同步原语说明](https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/cpp-language-extensions.html)。
+
+### 先把 `expf(x-max)` 写到 output，少算一次指数会更快吗？
+
+本次实验没有更快。`(128,4096)` 的三轮 Event 平均 latency 从直接重算版
+`0.005178 ms` 增至暂存版 `0.009092 ms`，增加约 `75.6%`；其他三个
+测试形状也均回退。源码层面，直接重算版每元素是三次 global load、
+一次 global store、两次 `expf`；暂存版仍是三次 global load，只是第三遍
+从 input 改为 output，并多一次 global store，`expf` 减为一次。
+暂存版 global-load Profile 仍是 `49152 request / 196608 sector`，即
+`4 sector/request`；这些指标没有测 store、缓存命中或实际 DRAM 流量，
+所以不能把回退全部归因于某一个部件。两批 Benchmark 也不是同一轮
+交替 A/B，百分比宜视为当前证据而非精确代价分解。减少源码中的计算
+次数不保证 kernel 更快，必须看整个读、写、计算与同步路径。

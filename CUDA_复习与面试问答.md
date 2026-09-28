@@ -592,3 +592,19 @@ load 的 warp 数和每个 warp 的 load 次数。这里计数的是 L1/TEX 收�
 sector 的访问；跨 sector 的未对齐地址、跨步访问、掩码线程或重复访存都可能
 让实测 sector 数与“逻辑字节数/32”不同。应以每次 warp 访存触及的对齐
 32 字节区域为准，而不能把 request、sector 与 DRAM 事务混为一谈。
+
+## 9. Softmax
+
+### kernel 中不写 `std::` 的 `max`、`exp` 是 CPU 标准库函数吗？
+
+不是在 CPU 上执行。当前 V0 的 `row_max` 与 `input_row[i]` 均为 `float`；
+CUDA 11.8 提供设备端的 `max(float, float)` 重载，其行为等价于 `fmaxf`。
+`exp(float)` 也有设备端单精度重载，可明确写成 `expf(float)`。这些调用
+在 kernel 的 GPU 设备代码中执行；编译器可能把它们内联或降低为多条设备
+指令，不能仅凭源码名字断定具体指令序列或耗时。
+
+作为对照，`softmax_harness.h` 的 CPU Reference 显式使用 `std::max`、
+`std::exp`，且将输入转为 `double`，它们在主机端执行。若希望 GPU 源码的
+精度意图更明显，可以显式使用 `fmaxf`、`expf`；不要把它们误认为会把数据
+传回 CPU 的函数调用。本节尚未取得 V0 性能数据，不能由函数名判断瓶颈。
+对应函数定义可查 [CUDA 11.8 Math API](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-math-api/group__CUDA__MATH__SINGLE.html)。

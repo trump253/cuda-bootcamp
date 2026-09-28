@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 9 — Softmax V0 框架已准备；等待学习者实现逐行朴素 kernel
+Day 9 — 学习者已填写 Softmax V0 逐行朴素 kernel；待正确性与性能验收
 
 ## 已完成
 
@@ -228,19 +228,22 @@ Day 9 — Softmax V0 框架已准备；等待学习者实现逐行朴素 kernel
   编译通过。空 kernel 的正确性测试按预期全部 FAIL 并以退出码 1 返回，
   不是 Day 9 正确性验收结果。
 - 已为本工程准备本地 Git 仓库；构建目录、独立 CMake 临时目录及 Nsight
-  报告文件由 `.gitignore` 排除。远端与首次提交留待学习者配置 Git 身份后完成。
+  报告文件由 `.gitignore` 排除。首次本地提交已完成；未配置远端，未 push。
+- 学习者已在 `07_softmax/v0.cu` 填写一线程一行的 V0 算法，包括求最大值、
+  指数求和与归一化；当前尚未提交正确性、Sanitizer、Benchmark 或 Profile
+  输出，不能据此判定 V0 已验收。
 
 ## 当前任务
 
-- 学习者完成 Day 9 Softmax V0 的逐行稳定计算，并提交正确性、Sanitizer、
-  三轮 CUDA Event Benchmark 与首次 Profile 输出供 Review。
+- 学习者先验证 Day 9 Softmax V0 的正确性与 Sanitizer，再提交三轮 CUDA
+  Event Benchmark 和首次 Profile 输出供 Review。
 
 ## 当前问题
 
 - Day 1 的 GPU/CPU 索引变量类型尚未完全统一为 `std::size_t`。
 - Day 8 的 `N=1024` 短 kernel 多轮结果有明显波动；若以后需要与 Release
   构建对照，须在新配置下重新采集，不能混用两种构建的数值。
-- Day 9 V0 的 GPU kernel 当前仍为空模板；尚无正确性和性能数据。
+- Day 9 V0 的 GPU kernel 已由学习者填写，但尚无正确性和性能数据。
 
 ## 今日关键知识
 
@@ -334,9 +337,12 @@ Day 9 — Softmax V0 框架已准备；等待学习者实现逐行朴素 kernel
 - Day 9 的数值稳定 Softmax 先按行求最大值，再计算 `exp(x-max)` 并归一化；
   减去最大值不改变结果，但可避免大正数输入导致指数溢出。V0 采用一线程一行
   作为正确性基线，暂不做行内并行规约。
+- 当前 V0 的 `max(float,float)` 是 CUDA 设备端数学重载，行为对应 `fmaxf`；
+  `exp(float)` 也在设备端执行，可显式写为 `expf`。CPU Reference 中的
+  `std::max` 与 `std::exp(double)` 则在主机端执行；函数名不等于性能证据。
 
 ## 下一任务
 
-- 学习者阅读 `07_softmax/DAY9_V0_TASK.md` 后完成 `v0.cu` 的 kernel TODO；
-  先通过正确性和 Compute Sanitizer，再提交三轮 Benchmark 与 Profile 证据。
+- 学习者先用 `--correctness-only` 与 Compute Sanitizer 检查已填写的 V0，
+  再提交三轮 Benchmark 与 Profile 证据。
   V0 经 Review 后才准备 V1 Shared Memory 任务模板。

@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 9 — V2 Warp Shuffle Softmax 已完成正确性与性能闭环；下一步按计划准备 V3
+Day 9 — V0/V1/V2 Softmax 已完成闭环；下一步按计划准备 V3 合理向量化
 
 ## 已完成
 
@@ -455,9 +455,14 @@ Day 9 — V2 Warp Shuffle Softmax 已完成正确性与性能闭环；下一步�
   同一地址不会形成 bank conflict，但不会把不同 warp 的 8 条
   load 指令合成一条。V1 的 load 公式括号 `8×2+1` 分别对应
   8 轮、每轮 2 条 shared load、最终 1 条标量 load。
+- 已清理 V0/V1/V2 源码中完成项的过时 TODO 和占位说明，补充行映射、
+  规约单位元、shared-memory barrier 与 V2 两级规约的中文注释；
+  V2 实现与已验收的正确性、Benchmark、Profile 记录一同归档。
+  清理后 V1/V2 重新编译并各通过 17 组正确性；V2 Compute Sanitizer
+  复验为 0 errors、0 bytes leaked，退出码为 0。
 
 ## 下一任务
 
-- 学习者清理 V2 已完成 TODO 的过时注释；需要进入下一阶段时，
-  准备 V3 合理向量化的中文任务框架，核心实现仍留给学习者。
+- 按计划准备 V3 合理向量化：先以当前 FP32 V2 为基线，明确 `float4`
+  的对齐、尾部处理和同配置对照要求；核心 kernel 由学习者实现。
   暂存变体的 Sanitizer 摘要若补发，再补记其安全复验状态。

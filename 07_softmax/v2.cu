@@ -9,14 +9,18 @@ static_assert(kSoftmaxV2BlockSize % kSoftmaxV2WarpSize == 0,
               "block 大小必须是 warp 大小的整数倍");
 
 __device__ float warp_reduce_max_v2(float value) {
-    // TODO 1：用 __shfl_down_sync 在一个 warp 内规约最大值。
-    // 当前返回值仅供模板编译，不是正确的规约结果。
+    // 32 个真实 lane 都参与 shuffle；规约结果由 lane 0 使用。
+    for (int delta = kSoftmaxV2WarpSize / 2; delta > 0; delta >>= 1) {
+        value = fmaxf(value, __shfl_down_sync(kSoftmaxV2FullWarpMask, value, delta));
+    }
     return value;
 }
 
 __device__ float warp_reduce_sum_v2(float value) {
-    // TODO 2：用 __shfl_down_sync 在一个 warp 内规约求和。
-    // 当前返回值仅供模板编译，不是正确的规约结果。
+    // 与 max 相同，逐步合并距离 delta 处的 lane 值。
+    for (int delta = kSoftmaxV2WarpSize / 2; delta > 0; delta >>= 1) {
+        value += __shfl_down_sync(kSoftmaxV2FullWarpMask, value, delta);
+    }
     return value;
 }
 
@@ -44,12 +48,17 @@ __global__ void softmax_v2_kernel(const float* input, float* output,
     if (lane == 0) {
         warp_max[warp] = local_warp_max;
     }
-    __syncthreads();
+    __syncthreads();  // 等待全部 warp 的 partial max 写入。
 
-    // TODO 3：仅让 warp 0 规约 kSoftmaxV2WarpsPerBlock 个 partial max。
-    // 其余 lane 应提供 -INFINITY；由 lane 0 写 row_max_shared，
-    // 再让整个 block 同步后读取最终行最大值。
-    float row_max = 0.0f;  // 占位值：完成 TODO 3 前，正确性测试应失败。
+    // warp 0 规约 8 个 partial；其余 24 个 lane 以 -INFINITY 补齐。
+    if (warp == 0) {
+        float max_val = warp_reduce_max_v2(lane < kSoftmaxV2WarpsPerBlock ? warp_max[lane] : -INFINITY);
+        if (lane == 0) {
+            row_max_shared = max_val;
+        }
+    }
+    __syncthreads();  // 等待 warp 0 写出行最大值，再由整个 block 读取。
+    float row_max = row_max_shared;
 
     float thread_sum = 0.0f;
     for (int col = tid; col < hidden; col += kSoftmaxV2BlockSize) {
@@ -61,12 +70,17 @@ __global__ void softmax_v2_kernel(const float* input, float* output,
     if (lane == 0) {
         warp_sum[warp] = local_warp_sum;
     }
-    __syncthreads();
+    __syncthreads();  // 等待全部 warp 的 partial sum 写入。
 
-    // TODO 4：仅让 warp 0 规约 kSoftmaxV2WarpsPerBlock 个 partial sum。
-    // 其余 lane 应提供 0；由 lane 0 写 row_sum_shared，
-    // 再让整个 block 同步后读取最终行指数和。
-    float row_sum = 1.0f;  // 占位值：完成 TODO 4 前，正确性测试应失败。
+    // warp 0 规约 8 个 partial；其余 24 个 lane 以 0 补齐。
+    if (warp == 0) {
+        float sum_val = warp_reduce_sum_v2(lane < kSoftmaxV2WarpsPerBlock ? warp_sum[lane] : 0.0f);
+        if (lane == 0) {
+            row_sum_shared = sum_val;
+        }
+    }
+    __syncthreads();  // 等待 warp 0 写出行指数和，再由整个 block 读取。
+    float row_sum = row_sum_shared;
 
     const float inv_sum = 1.0f / row_sum;
     for (int col = tid; col < hidden; col += kSoftmaxV2BlockSize) {

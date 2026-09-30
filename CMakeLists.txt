@@ -77,7 +77,7 @@ endfunction()
 # add_executable(softmax_v0 07_softmax/v0.cu)
 # target_include_directories(softmax_v0 PRIVATE common 07_softmax)
 
-# Day 9：保留已验收的 V1 基线，与学习者实现的 V2 Warp Shuffle 对照。
+# Day 9：保留已验收的 V1/V2，供下一阶段的同配置性能对照。
 add_executable(softmax_v1 07_softmax/v1.cu)
 target_include_directories(softmax_v1 PRIVATE common 07_softmax)
 

@@ -10,15 +10,14 @@ __global__ void softmax_v1_kernel(const float* input, float* output,
     __shared__ float shared_max[kSoftmaxV1BlockSize];
     __shared__ float shared_sum[kSoftmaxV1BlockSize];
 
-    // TODO 1：每个线程扫描本行由自己负责的列，得到局部最大值。
-    //         无元素的线程必须给 max 规约提供正确的单位元。
+    // 相邻线程从相邻列起步；无元素线程以 -INFINITY 参与 max 规约。
     float thread_max = -INFINITY;
     int row_start = row * hidden;
     for (int i = tid; i < hidden; i += kSoftmaxV1BlockSize) {
         thread_max = fmaxf(thread_max, input[row_start + i]);
     }
 
-    // TODO 2：所有线程协作，将局部最大值写入 shared_max 并规约出行最大值。
+    // 写入局部最大值后同步，确保 tree 的第一轮能读到所有线程的结果。
     shared_max[tid] = thread_max;
     __syncthreads();
 
@@ -26,18 +25,17 @@ __global__ void softmax_v1_kernel(const float* input, float* output,
         if (tid < stride) {
             shared_max[tid] = fmaxf(shared_max[tid], shared_max[tid + stride]);
         }
-        __syncthreads();
+        __syncthreads();  // 本轮写入完成后，下一轮才能读取。
     }
     float row_max = shared_max[0];
 
-    // TODO 3：每个线程扫描负责的列，累加 expf(x - 行最大值)。
-    //         无元素的线程必须给 sum 规约提供正确的单位元。
+    // 每个线程累加其列的指数值；无元素线程以 0 参与 sum 规约。
     float thread_sum = 0.0f;
     for (int i = tid; i < hidden; i += kSoftmaxV1BlockSize) {
         thread_sum += expf(input[row_start + i] - row_max);
     }
 
-    // TODO 4：所有线程协作，将局部和写入 shared_sum 并规约出行指数和。
+    // 与 max 相同，先同步局部结果，再逐轮规约求和。
     shared_sum[tid] = thread_sum;
     __syncthreads();
 
@@ -45,10 +43,10 @@ __global__ void softmax_v1_kernel(const float* input, float* output,
         if (tid < stride) {
             shared_sum[tid] += shared_sum[tid + stride];
         }
-        __syncthreads();
+        __syncthreads();  // 保证本轮 shared 写入对下一轮可见。
     }
 
-    // TODO 5：各线程将自己负责的列归一化并写入 output。
+    // 各线程归一化并写回自己的列；这里重新计算 expf，不暂存中间结果。
     float inv_sum = 1.0f / shared_sum[0];
     for (int i = tid; i < hidden; i += kSoftmaxV1BlockSize) {
         output[row_start + i] = expf(input[row_start + i] - row_max) * inv_sum;

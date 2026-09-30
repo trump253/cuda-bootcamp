@@ -78,8 +78,8 @@ cuda-bootcamp/
   对照与 Notes 已完成，验收通过。
 
 Day 8 的验收记录位于 `06_fp16_half2/README.md`；Day 9 Softmax 的
-V0/V1 已验收，当前由学习者实现 V2 Warp Shuffle 版。详细进度见
-`PROGRESS.md`。V2 模板可编译，但规约 TODO 未完成前正确性测试会失败。
+V0/V1/V2 已验收，下一阶段按计划学习 V3 合理向量化。详细进度见
+`PROGRESS.md`。V3 的核心 kernel 尚未开始实现。
 已学习的问题与答案持续整理在 `CUDA_复习与面试问答.md`。
 
 ## 构建与运行

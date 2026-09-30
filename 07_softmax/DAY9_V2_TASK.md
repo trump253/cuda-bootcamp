@@ -1,4 +1,7 @@
-# Day 9 当前任务：Softmax V2 Warp Shuffle
+# Day 9 已完成任务：Softmax V2 Warp Shuffle
+
+以下保留当时的模板任务与验收要求，供复习实现过程；当前实现和实测结果
+见 `v2.cu` 与 `README.md`，文中的“TODO 未完成”描述只适用于原模板。
 
 ## 今天只需理解什么
 

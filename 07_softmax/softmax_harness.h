@@ -211,7 +211,8 @@ int run_softmax_exercise(const char* variant, MakeConfig make_config,
         }
     }
     const int boundary_cases[][2] =
-        {{1, 1}, {1, 31}, {16, 33}, {128, 257}, {129, 33}};
+        {{1, 1}, {1, 2}, {1, 31}, {5, 6},
+         {16, 33}, {128, 257}, {129, 33}};
     for (const auto& shape : boundary_cases) {
         all_passed = check_softmax_case(variant, shape[0], shape[1],
                                          make_config, launch) && all_passed;

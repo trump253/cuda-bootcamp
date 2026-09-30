@@ -77,9 +77,13 @@ endfunction()
 # add_executable(softmax_v0 07_softmax/v0.cu)
 # target_include_directories(softmax_v0 PRIVATE common 07_softmax)
 
-# Day 9：保留已验收的 V1/V2，供下一阶段的同配置性能对照。
-add_executable(softmax_v1 07_softmax/v1.cu)
-target_include_directories(softmax_v1 PRIVATE common 07_softmax)
+# Day 9 V1 已完成；需要复查历史对照时取消以下两行注释。
+# add_executable(softmax_v1 07_softmax/v1.cu)
+# target_include_directories(softmax_v1 PRIVATE common 07_softmax)
 
+# Day 9：保留 V2 基线，与学习者待完成的 V3 float4 版对照。
 add_executable(softmax_v2 07_softmax/v2.cu)
 target_include_directories(softmax_v2 PRIVATE common 07_softmax)
+
+add_executable(softmax_v3 07_softmax/v3.cu)
+target_include_directories(softmax_v3 PRIVATE common 07_softmax)

@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 9 — V0/V1/V2 Softmax 已完成闭环；下一步按计划准备 V3 合理向量化
+Day 9 — V0/V1/V2 Softmax 已完成闭环；当前进行 V3 FP32 float4 练习
 
 ## 已完成
 
@@ -460,9 +460,32 @@ Day 9 — V0/V1/V2 Softmax 已完成闭环；下一步按计划准备 V3 合理�
   V2 实现与已验收的正确性、Benchmark、Profile 记录一同归档。
   清理后 V1/V2 重新编译并各通过 17 组正确性；V2 Compute Sanitizer
   复验为 0 errors、0 bytes leaked，退出码为 0。
+- 已创建 V3 FP32 `float4` 练习框架，复用 V2 已验收的两级规约、
+  主机端 Reference/正确性/Benchmark/Profile；只把对齐行的三遍向量化
+  访问与尾部处理留给学习者，未对齐行提供 V2 标量路径。共用测试新增
+  `(1,2)`、`(5,6)`，覆盖余数为 2 的尾部与行首对齐变化。
+- 默认 CMake 保留 V2/V3 作同条件对照，V1 target 归档为注释。
+- V2/V3 目标均编译通过；扩展测试后 V2 的 19 组正确性全部 PASS、
+  退出码为 0，Compute Sanitizer 为 0 errors、0 bytes leaked。
+  V3 未填写 TODO 时 19 组均按预期 FAIL、退出码为 1，因此目前
+  只是任务模板，尚未达到正确性或性能验收。
+
+## 当前问题
+
+- V3 对齐行的六处向量化与尾部 TODO 尚未实现；正确性失败是模板预期。
+- `float4` 是否改善实际访存指令数及 latency，仍需学习者完成实现后实测。
+
+## 今日关键知识
+
+- `float4` 每组覆盖四个相邻 FP32 元素；必须检查行首实际地址的
+  16 字节对齐，尾部不足四个元素不能直接用完整 `float4` 读取。
+- 对照 V2/V3 时固定 dtype、block、规约算法和测试口径，先验证正确性，
+  再用 Event 与 Profile 判断访存变化和性能收益。
 
 ## 下一任务
 
-- 按计划准备 V3 合理向量化：先以当前 FP32 V2 为基线，明确 `float4`
-  的对齐、尾部处理和同配置对照要求；核心 kernel 由学习者实现。
+- 学习者完成 `07_softmax/v3.cu` 的六处 TODO：对齐行的 `float4`
+  求最大值、指数和、归一化写回及各自尾部处理；先通过正确性与
+  Compute Sanitizer，再与 V2 做同配置三轮 Benchmark 和最小 Profile。
+  FP16/half2 留在 FP32 阶段闭环后再评估，不提前扩展。
   暂存变体的 Sanitizer 摘要若补发，再补记其安全复验状态。

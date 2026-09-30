@@ -3,18 +3,21 @@
 本节输入、输出均为行主序 FP32 矩阵，形状 `[rows, hidden]`。每一行独立执行
 Softmax。按计划依次完成 V0 逐行朴素版、V1 Shared Memory、V2 Warp Shuffle、
 V3 合理向量化；每版都要有正确性、Benchmark 与必要的 Profile 证据，不能只凭
-源码推断加速。V0/V1/V2 已验收；下一阶段是 V3，核心实现仍由学习者完成。
+源码推断加速。V0/V1/V2 已验收；当前开放 V3 FP32 `float4` 练习，
+核心实现仍由学习者完成。
 
 ## 当前文件
 
 - `v0.cu`：学习者已实现 V0 逐行串行 GPU kernel，作为正确性和性能基线。
 - `v1.cu`：学习者已实现每行一个 block 的 Shared Memory max/sum 规约。
 - `v2.cu`：学习者已实现 warp 内 shuffle 与跨 warp 的两级 max/sum 规约。
+- `v3.cu`：复用 V2 的规约与共用测试，留下 `float4` 读取、写回及尾部处理 TODO。
 - `softmax_harness.h`：共用的确定性输入、CPU Reference、GPU 正确性校验、
   CUDA Event Benchmark 和单次 kernel Profile 入口；不用重新写测试样板。
 - `DAY9_V0_TASK.md`：已完成的 V0 任务说明。
 - `DAY9_V1_TASK.md`：已完成的 V1 任务、验收标准和提交内容。
 - `DAY9_V2_TASK.md`：已完成的 V2 Warp Shuffle 任务与验收标准。
+- `DAY9_V3_TASK.md`：当前 V3 FP32 `float4` 任务、测试与对照要求。
 
 V1 的初版与列映射修正版均已完成正确性、Benchmark/Profile 对照。
 

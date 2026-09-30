@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 9 — V1 基线已恢复，V2 Warp Shuffle 任务框架已建立，待学习者实现规约
+Day 9 — V2 Warp Shuffle Softmax 已完成正确性与性能闭环；下一步按计划准备 V3
 
 ## 已完成
 
@@ -280,12 +280,29 @@ Day 9 — V1 基线已恢复，V2 Warp Shuffle 任务框架已建立，待学习
   `github.com/trump253/cuda-bootcamp` 的 `main`。`origin` 拉取使用
   HTTPS、推送使用已认证的 SSH；用户已明确要求后续每次本地提交后
   自动推送。仍只提交当前任务范围内的文件，不顺手纳入其他工作区改动。
+- 学习者已实现 V2 warp max/sum 与跨 warp 规约；17 个 shape 全部
+  PASS、程序退出码 0，Compute Sanitizer 为 0 errors、0 bytes leaked，
+  退出码 0。full mask 参与的无效 lane 分别用 `-INFINITY` 与 `0`，
+  max/sum 各有两处 block barrier 保证 partial 与最终标量可见。
+- V1/V2 同轮交替三次 CUDA Event Benchmark：`(128,1024)` 平均
+  `0.004939/0.004148 ms`，V2 约快 `1.191×`；`(128,4096)` 平均
+  `0.007364/0.006722 ms`，V2 约快 `1.095×`。四个测试形状均显示
+  V2 更快，本轮与旧会话的 V1 绝对时长不混算。
+- 学习者完成 V1/V2 最小 Nsight Compute 对照：shared load 指令
+  `34816→2304`（少约 93.38%），store 指令 `18432→2304`
+  （少 87.50%），barrier stall 比例 `8.02%→6.97%`；Profile
+  duration `11.26→10.40 µs`。这些证据支持 V2 优化，但不能
+  单独分解全部加速原因。原始数据和计数推导已记入 `07_softmax/README.md`。
+- 已对照当前编译后的 shared LDS/STS 指令，推得 V1 load/store 为
+  `128×2×8×(8×2+1)=34816` / `128×2×8×(1+8)=18432`；
+  V2 两项均为 `128×2×9=2304`。这里是 warp 级指令数，
+  不是逐线程访存元素数，也不是实际 shared 请求字节数。V2 的
+  Reference、Correctness、Benchmark、Profile、Notes 闭环验收完成。
 
 ## 当前任务
 
-- 学习者完成 V2 的 warp max、warp sum 与两次跨 warp 规约；
-  随后用现有框架验证正确性与 Sanitizer，交替测 V1/V2 的
-  CUDA Event，并对比最小化 Nsight Compute 指标。
+- 下一步按学习计划准备 V3 合理向量化 Softmax 任务；仍由学习者
+  完成核心 kernel，保持 V2 的正确性、Benchmark 与 Profile 对照。
 
 ## 当前问题
 
@@ -301,6 +318,8 @@ Day 9 — V1 基线已恢复，V2 Warp Shuffle 任务框架已建立，待学习
 - 暂存 `expf` 变体的 Compute Sanitizer 摘要与退出码尚未收到；
   output store 与缓存路径也未 Profile。目前足以判断没有观测到
   性能收益，但不足以确定唯一的回退原因。
+- V2 源码仍保留模板期的 `TODO` 与“占位值”注释，虽然实际代码已经
+  实现并通过测试；由学习者后续清理注释即可，不影响本轮性能结论。
 
 ## 今日关键知识
 
@@ -423,11 +442,14 @@ Day 9 — V1 基线已恢复，V2 Warp Shuffle 任务框架已建立，待学习
   昂贵函数不自动等于整个 kernel 更快。
 - Softmax V2 仍保持每行一个 256 线程 block：8 个 warp 分别规约
   局部值，warp 0 再规约 8 个 partial；跨 warp 传递仍需要 shared
-  memory 和 block barrier。V2 是否更快仍须实测。
+  memory 和 block barrier。本轮 Event 已证明同条件下 V2 更快。
+- ncu 的 `smsp__inst_executed_op_shared_{ld,st}` 计数单位是 warp
+  级 SASS 指令；当前 V1 的带谓词 tree 指令可由 warp 发出，
+  即使部分 lane 的谓词为假。V2 每次规约每 block 只有 9 条
+  shared load 与 9 条 store 指令，不能把这些数解释为字节数。
 
 ## 下一任务
 
-- 学习者完成 `07_softmax/v2.cu` 中四处规约 TODO，并提交 17 个 shape
-  的正确性、Sanitizer 摘要与退出码、V1/V2 交替三轮 Event、
-  最小化 Profile 原始输出供 Review。暂存变体的 Sanitizer 摘要若补发，
-  再把该实验的安全复验状态补记为通过或失败。
+- 学习者清理 V2 已完成 TODO 的过时注释；需要进入下一阶段时，
+  准备 V3 合理向量化的中文任务框架，核心实现仍留给学习者。
+  暂存变体的 Sanitizer 摘要若补发，再补记其安全复验状态。

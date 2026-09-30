@@ -699,3 +699,28 @@ shared 值；轮末 barrier 保证本轮写入对下一轮读取可见。特别�
 所以不能把回退全部归因于某一个部件。两批 Benchmark 也不是同一轮
 交替 A/B，百分比宜视为当前证据而非精确代价分解。减少源码中的计算
 次数不保证 kernel 更快，必须看整个读、写、计算与同步路径。
+
+### Softmax V1/V2 的 shared-load/store 指令数为什么能算到 34816/18432 与 2304/2304？
+
+本次 Profile 有 `128` 个 block、每 block `256/32=8` 个 warp，max 和
+sum 各规约一次。`smsp__inst_executed_op_shared_{ld,st}.sum` 统计的是
+warp 级共享内存指令执行数，不能直接当成“线程读写元素数”或实际
+shared-memory 事务数。对当前二进制，`cuobjdump` 可见 V1 每轮 tree
+编译成两条带谓词的 `LDS` 和一条带谓词的 `STS`；ncu 的普通
+`inst_executed` 会计入 warp 执行的这些指令，即便某些 lane 的谓词为假。
+
+- V1 每次规约每 block 有 `8` 条初始化 store；8 轮各由 8 个 warp
+  执行 `2 LDS + 1 STS`；最后 8 个 warp 各读一次行标量。所以两次
+  规约的 load 为 `128×2×8×(8×2+1)=34816 inst`，store 为
+  `128×2×8×(1+8)=18432 inst`。
+- V2 每次规约每 block 有 8 个 warp partial store 和 1 个最终标量
+  store，共 `9` 条 warp store；warp 0 读 partial 是 `1` 条 warp load，
+  全 block 的 8 个 warp 读最终标量是 `8` 条，共 `9` 条 warp load。
+  两次规约得到 `128×2×9=2304 inst`，load/store 都一样。
+
+V1 `if (tid<stride)` 中实际参与的 warp 会随 stride 减少，不能把
+上述 warp 指令数理解为所有 warp 每轮都进行了有效访存。若想验证
+谓词影响，可用 ncu 查询 `smsp__inst_executed_op_shared_ld_pred_off_all.sum`
+和对应 store 指标；它们与 `_pred_on_any` 区分整 warp 谓词关闭和
+至少一个 lane 有效。NVIDIA 对 warp 级执行指令的定义见
+[Nsight Compute 指标说明](https://docs.nvidia.com/nsight-compute/NsightCompute/)。

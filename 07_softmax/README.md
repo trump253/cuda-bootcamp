@@ -162,3 +162,68 @@ store 的实际指令和缓存/DRAM 流量尚未采集，不能断言单一的�
 原修正版继续作为 V1 性能基线；学习者已将工作树中的 `v1.cu` 恢复为
 归一化时重新计算 `expf` 的版本。V2 用它做同配置对照，暂存实验只保留
 为一次负收益记录。
+
+## V2 Warp Shuffle：正确性、Benchmark、Profile
+
+学习者独立实现 warp max/sum 和两次跨 warp 规约。17 个 shape 全部
+`PASS`、程序退出码为 0；Compute Sanitizer memcheck 为 `0 errors`、
+`0 bytes leaked`，退出码为 0。第一处 block barrier 保证所有 warp 的
+partial 已写入 shared；第二处保证 warp 0 写出的行 max/sum 已可供
+整个 block 读取。warp 0 中只有前 8 个 lane 读取有效 partial，
+其余 lane 分别用 `-INFINITY`、`0` 参加 full-mask 规约。
+
+同一 GPU、同一构建配置下，V1/V2 整程序预热后交替三轮；下表为
+CUDA Event kernel-only latency（warm-up 10、正式迭代 100）：
+
+| 形状 | V1 三轮 / 平均（ms） | V2 三轮 / 平均（ms） | V1/V2 平均延迟比 |
+| --- | --- | --- | ---: |
+| `(1,128)` | 0.003342 / 0.003340 / 0.003388；0.003357 | 0.003052 / 0.003277 / 0.002867；0.003065 | 1.095× |
+| `(16,512)` | 0.003902 / 0.003891 / 0.003850；0.003881 | 0.003396 / 0.003501 / 0.003393；0.003430 | 1.131× |
+| `(128,1024)` | 0.004964 / 0.004936 / 0.004918；0.004939 | 0.004112 / 0.004096 / 0.004235；0.004148 | 1.191× |
+| `(128,4096)` | 0.007373 / 0.007368 / 0.007351；0.007364 | 0.006737 / 0.006713 / 0.006717；0.006722 | 1.095× |
+
+四个形状均显示 V2 更快；例如 `(128,4096)` 延迟降低约 `8.71%`。
+本轮 V1 绝对延迟不同于先前的 `0.005178 ms`，不能跨会话混算速度比，
+以同轮交替测得的 V1/V2 数据为准。小形状结果仍受短 kernel 波动影响。
+
+学习者对 `(128,4096)` 各采集一次 Nsight Compute：
+
+| 指标 | V1 | V2 |
+| --- | ---: | ---: |
+| `gpu__time_duration.sum` | 11.26 µs | 10.40 µs |
+| `smsp__inst_executed_op_shared_ld.sum` | 34816 inst | 2304 inst |
+| `smsp__inst_executed_op_shared_st.sum` | 18432 inst | 2304 inst |
+| `smsp__warp_issue_stalled_barrier_per_warp_active.pct` | 8.02% | 6.97% |
+
+shared load/store 的 warp 指令计数分别降低约 `93.38%`/`87.50%`，
+barrier stall 比例下降 `1.05` 个百分点；这些与 Event 加速方向一致，
+但 stall 百分比不是耗时占比，不能单独证明唯一的加速原因。ncu 的
+`11.26/10.40 µs` 也不与正常 Event 的绝对时长混算。
+
+### 本次 shared 指令计数如何核对
+
+Profile 使用 128 个 block、每 block 256 线程即 8 个 warp，分别做
+max/sum 两次规约。计数单位是执行过的 **warp 级 SASS 指令**，不是
+逐线程读写次数，也不是 shared-memory 请求字节数；相关口径见
+[NVIDIA Nsight Compute 指标说明](https://docs.nvidia.com/nsight-compute/NsightCompute/)。
+
+- V1 每次规约：初始化 shared 有 `8` 条 warp store；8 轮 tree 各有
+  `2` 条 shared load、`1` 条 shared store，当前编译器把条件访问
+  生成为带谓词的指令，每轮都由 8 个 warp 执行；最终各 warp 读取
+  行标量，共 `8` 条 load。因此两次规约的 load 为
+  `128 block × 2 × 8 warp × (8 轮 × 2 load + 1 final load)
+  = 34816 inst`；store 为
+  `128 × 2 × 8 × (1 init store + 8 轮 × 1 store)=18432 inst`。
+  部分 warp 的条件为假，仍可计入此处的指令数，不代表都产生有效
+  shared-memory 请求。
+- V2 每次规约：8 个 warp 各写 1 个 partial，再由 warp 0 写 1 个
+  行标量，所以每 block 有 `9` 条 warp store；warp 0 读取 8 个
+  partial 对应 `1` 条 warp load，随后 8 个 warp 各读取行标量一次，
+  共 `9` 条 warp load。两次规约、128 个 block 给出
+  `128 × 2 × 9 = 2304 inst`，与 load/store 两项实测均一致。
+
+上述公式依赖当前编译结果；改源码、编译参数或架构后，不能保证
+仍是相同指令数。若要区别“warp 发出了带谓词的指令”与“至少一个
+lane 实际参与”，可继续采集同名指标的 `_pred_off_all` 或
+`_pred_on_any` 变体。V2 的正确性、Benchmark、Profile、Notes
+闭环已完成；Day 9 的 V3 尚未开始。

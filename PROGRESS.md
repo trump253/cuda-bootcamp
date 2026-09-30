@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 9 — V3 FP32 float4 已完成测试与 Notes；清理注释后评估 FP16/half2
+Day 9 — V3 FP32 float4 已归档；当前进行 FP16 存储与 half2 成对访存
 
 ## 已完成
 
@@ -303,12 +303,12 @@ Day 9 — V3 FP32 float4 已完成测试与 Notes；清理注释后评估 FP16/h
   V1 公式中的外层 `8` 是每 block 的 warp 数，括号中的 `8`
   是 tree 规约轮数，带谓词的指令计数不同于真正参与的线程数。
 
-## 当前任务
+## V2 验收时的下一任务（历史记录）
 
 - 下一步按学习计划准备 V3 合理向量化 Softmax 任务；仍由学习者
   完成核心 kernel，保持 V2 的正确性、Benchmark 与 Profile 对照。
 
-## 当前问题
+## V2 验收时尚待确认的问题（历史记录）
 
 - Day 1 的 GPU/CPU 索引变量类型尚未完全统一为 `std::size_t`。
 - Day 8 的 `N=1024` 短 kernel 多轮结果有明显波动；若以后需要与 Release
@@ -325,7 +325,7 @@ Day 9 — V3 FP32 float4 已完成测试与 Notes；清理注释后评估 FP16/h
 - V2 源码仍保留模板期的 `TODO` 与“占位值”注释，虽然实际代码已经
   实现并通过测试；由学习者后续清理注释即可，不影响本轮性能结论。
 
-## 今日关键知识
+## 历次关键知识
 
 - kernel 在设备端执行，由主机端代码启动。
 - 一维全局线程编号将 grid 中的 block 和 thread 映射到向量元素。
@@ -481,12 +481,23 @@ Day 9 — V3 FP32 float4 已完成测试与 Notes；清理注释后评估 FP16/h
   向量化/标量/标量/标量/向量化/标量，并解释向量化减少 request、
   逻辑输入量不变。结合实测的 4→16 sector/request 和总 sector
   不变，V3 FP32 的概念解释与 Notes 已完成；负收益如实保留。
+- 已清理 `07_softmax/v3.cu` 六处完成项的过时 TODO，仅修改中文注释，
+  保留向量组映射、尾部标量处理和规约说明，不改变算法。
+- 按学习计划将 FP16/half2 任务限定为 FP16 输入/输出存储、FP32
+  max/exp/sum/归一化，并提供同 dtype 的标量 FP16 基线与 half2
+  练习版。主机测试复用 Day 9 的输入生成和 CPU Reference，先量化
+  输入再生成参考值，覆盖原 19 个形状及 CUDA Event/Profile 路径。
+- `softmax_fp16_scalar` 和 `softmax_fp16_half2` 均编译通过；标量基线
+  19 组正确性全部 PASS、退出码 0，Compute Sanitizer 为 0 errors、
+  0 bytes leaked、退出码 0。half2 模板的六处 TODO 尚未实现，
+  19 组按预期 FAIL、退出码 1，未进行性能验收。
 
 ## 当前问题
 
-- V3 的正确性、最小 Benchmark/Profile 已完成，但性能并无一致加速；
-  目前不能单独归因于指数计算、规约或额外指令。源码中的模板 TODO
-  注释尚未清理，不影响功能但不应留在最终归档中。
+- FP16 half2 的成对读取、FP32 局部计算和成对写回尚未实现；
+  Benchmark/Profile 只能在正确性和 Sanitizer 通过后进行。
+- FP32 `float4` 版的性能没有一致收益，不能把这次负收益直接推广到
+  FP16 half2；两者 dtype、每组宽度和数据量均不同。
 
 ## 今日关键知识
 
@@ -501,10 +512,14 @@ Day 9 — V3 FP32 float4 已完成测试与 Notes；清理注释后评估 FP16/h
   sector 从 4 增到 16、总 sector 不变；请求数下降不等于整体加速。
 - 逻辑读取字节数不变本身不能保证所有实现的 sector 数都相同；
   本次 sector 相同还与两版对齐且覆盖相同输入区域的访问模式相符。
+- FP16 Softmax 的主机参考先量化输入，再以量化后的真实数值求 double
+  Softmax；核内以 FP32 求 max、`expf`、sum，最后写回才舍入为 FP16。
+- `half2` 的任务是成对访存，不是用 FP16 `__hadd2` 求指数和；
+  输入/输出行首需满足 4 字节对齐，奇数列尾部用标量处理。
 
 ## 下一任务
 
-- 学习者清理 `07_softmax/v3.cu` 已完成项的过时 TODO 注释，保留
-  必要的对齐、尾部和规约说明。随后按计划评估 V3 的 FP16/half2
-  合理向量化练习；核心 kernel 仍由学习者实现。
+- 学习者按 `07_softmax/DAY9_V3_FP16_TASK.md` 完成
+  `v3_fp16.cu` 的六处 half2 TODO；先交正确性与 Compute Sanitizer，
+  再与标量 FP16 基线做交替三轮 Benchmark 和最小 Profile。
   暂存变体的 Sanitizer 摘要若补发，再补记其安全复验状态。

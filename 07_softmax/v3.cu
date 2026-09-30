@@ -56,21 +56,18 @@ __global__ void softmax_v3_kernel(const float* input, float* output,
 
     float thread_max = -INFINITY;
     if (aligned) {
-        // TODO 1：每个线程处理 group=tid、tid+blockDim.x、... 的 float4。
-        // 将四个分量并入 thread_max；不得读取 vector_groups 之后。
+        // 相邻线程处理相邻的四元素组，后续组按 block 大小跨步。
         for (int group = tid; group < vector_groups;
              group += kSoftmaxV3BlockSize) {
-            // TODO：在这里读取一个 float4，并更新 thread_max。
             const float4 v = input_row4[group];
             thread_max = fmaxf(thread_max, v.x);
             thread_max = fmaxf(thread_max, v.y);
             thread_max = fmaxf(thread_max, v.z);
             thread_max = fmaxf(thread_max, v.w);
         }
-        // TODO 2：处理 [tail_start, hidden) 中不足四个的标量元素。
+        // 尾部不足四元素，以标量方式并入局部最大值。
         for (int col = tail_start + tid; col < hidden;
              col += kSoftmaxV3BlockSize) {
-            // TODO：在这里更新 thread_max。
             thread_max = fmaxf(thread_max, input_row[col]);
         }
     } else {
@@ -96,20 +93,18 @@ __global__ void softmax_v3_kernel(const float* input, float* output,
 
     float thread_sum = 0.0f;
     if (aligned) {
-        // TODO 3：按相同的 group 映射读取 float4，累加四个 expf(x-row_max)。
+        // 保持与 max 阶段相同的组映射，逐分量计算指数并累加。
         for (int group = tid; group < vector_groups;
              group += kSoftmaxV3BlockSize) {
-            // TODO：在这里读取一个 float4，并更新 thread_sum。
             const float4 v = input_row4[group];
             thread_sum += expf(v.x - row_max);
             thread_sum += expf(v.y - row_max);
             thread_sum += expf(v.z - row_max);
             thread_sum += expf(v.w - row_max);
         }
-        // TODO 4：将尾部标量元素计入 thread_sum。
+        // 剩余列仍以标量方式参与分母计算。
         for (int col = tail_start + tid; col < hidden;
              col += kSoftmaxV3BlockSize) {
-            // TODO：在这里更新 thread_sum。
             thread_sum += expf(input_row[col] - row_max);
         }
     } else {
@@ -134,11 +129,9 @@ __global__ void softmax_v3_kernel(const float* input, float* output,
     const float inv_sum = 1.0f / row_sum_shared;
 
     if (aligned) {
-        // TODO 5：按相同的 group 映射写回四个归一化输出。
-        // 先正确实现读取与写回，再用 Profile 确认是否生成向量化指令。
+        // 每组一次向量化写回；四个分量仍各自计算 expf 与归一化。
         for (int group = tid; group < vector_groups;
              group += kSoftmaxV3BlockSize) {
-            // TODO：在这里写回这个 group 的四个输出。
             const float4 input_v = input_row4[group];
             float4 output_v;
             output_v.x = expf(input_v.x - row_max) * inv_sum;
@@ -147,10 +140,9 @@ __global__ void softmax_v3_kernel(const float* input, float* output,
             output_v.w = expf(input_v.w - row_max) * inv_sum;
             output_row4[group] = output_v;
         }
-        // TODO 6：写回尾部标量元素，不得遗漏或越界。
+        // 尾部标量写回，避免完整 float4 跨过行边界。
         for (int col = tail_start + tid; col < hidden;
              col += kSoftmaxV3BlockSize) {
-            // TODO：在这里写回 output_row[col]。
             output_row[col] = expf(input_row[col] - row_max) * inv_sum;
         }
     } else {

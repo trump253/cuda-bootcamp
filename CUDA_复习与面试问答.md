@@ -772,3 +772,14 @@ sector 总数不变。L1/TEX 的 request/sector 不等于 DRAM 读取量；
 三轮 Event 中 `(128,4096)` 平均为 V2 `0.006681 ms`、
 V3 `0.006811 ms`，V3 约慢 `1.95%`；其他形状快慢不一，
 所以应记录为“减少了读取请求，但未获得一致的整体性能收益”。
+
+### FP16 Softmax 为什么先量化输入再生成 CPU Reference，规约却用 FP32？
+
+本次 GPU 输入实际存储为 `__half`。若 CPU Reference 直接用尚未量化的
+FP32 初始化值，比较结果会混入输入舍入误差，无法只检验 kernel。
+因此测试夹具先将每个输入舍入为 half，再将其转回 float 供 double
+CPU Reference 计算。核内 max、`expf`、指数和与归一化用 FP32，
+避免在较长行里把每步累加都舍入到 FP16；最终输出才转换为 half。
+`half2` 在这一练习里只改变成对读取/写回，不把 `__hadd2` 当作
+Softmax 规约。标量 FP16 与 half2 保持相同 dtype 和算术精度，
+才能较干净地比较访存分组变化；是否更快仍需 Event/Profile 证据。

@@ -4,7 +4,8 @@
 Softmax。按计划依次完成 V0 逐行朴素版、V1 Shared Memory、V2 Warp Shuffle、
 V3 合理向量化；每版都要有正确性、Benchmark 与必要的 Profile 证据，不能只凭
 源码推断加速。V0/V1/V2 已验收；V3 FP32 `float4` 已完成正确性、
-测量与 Notes，性能收益并未在所有形状成立。
+测量与 Notes，性能收益并未在所有形状成立。当前按计划开始
+FP16 存储与 `half2` 成对访存练习。
 
 ## 当前文件
 
@@ -12,12 +13,16 @@ V3 合理向量化；每版都要有正确性、Benchmark 与必要的 Profile �
 - `v1.cu`：学习者已实现每行一个 block 的 Shared Memory max/sum 规约。
 - `v2.cu`：学习者已实现 warp 内 shuffle 与跨 warp 的两级 max/sum 规约。
 - `v3.cu`：学习者已实现 `float4` 读取、写回与尾部处理，沿用 V2 两级规约。
+- `v3_fp16.cu`：同一源码构建 FP16 标量基线与待完成的 half2 练习版。
+- `softmax_fp16_harness.h`：复用输入生成和 CPU Reference，提供
+  基于真实 FP16 输入的验证、CUDA Event 与单 kernel Profile。
 - `softmax_harness.h`：共用的确定性输入、CPU Reference、GPU 正确性校验、
   CUDA Event Benchmark 和单次 kernel Profile 入口；不用重新写测试样板。
 - `DAY9_V0_TASK.md`：已完成的 V0 任务说明。
 - `DAY9_V1_TASK.md`：已完成的 V1 任务、验收标准和提交内容。
 - `DAY9_V2_TASK.md`：已完成的 V2 Warp Shuffle 任务与验收标准。
-- `DAY9_V3_TASK.md`：当前 V3 FP32 `float4` 任务、测试与对照要求。
+- `DAY9_V3_TASK.md`：已完成的 V3 FP32 `float4` 任务与对照要求。
+- `DAY9_V3_FP16_TASK.md`：FP16/half2 的当前任务与验收要求。
 
 V1 的初版与列映射修正版均已完成正确性、Benchmark/Profile 对照。
 
@@ -294,5 +299,20 @@ ncu 时长与正常 Event 时长分开使用，不混算绝对值。
 学习者已正确给出 `hidden=33` 时 row 0～5 的路径：向量化、
 标量、标量、标量、向量化、标量，并理解本次 request 降四倍
 但 sector 总数不变。V3 FP32 的正确性、Benchmark、最小 Profile
-与 Notes 已闭环；源码中尚有已完成项的模板 TODO 注释待清理。
+与 Notes 已闭环；源码的过时 TODO 注释现已清理。
 FP16/half2 部分及 Bootcamp 最终验收均尚未完成。
+
+## 当前 FP16/half2 练习状态
+
+FP32 `v3.cu` 已清理完成项的 TODO，仅保留对齐、尾部和规约说明；
+算法未改。FP16 部分采用同一 `__half` 输入/输出格式做标量/half2
+对照，max、`expf`、sum 与归一化保持 FP32。CPU Reference 先把
+输入舍入为 FP16，再以实际半精度输入值计算，避免把输入量化误差
+误判成 kernel 误差。输出的半精度舍入另由绝对/相对误差与行和检查。
+
+目前两个 CMake target 均编译通过。`softmax_fp16_scalar` 的
+19 组正确性全部 PASS、退出码 0，Compute Sanitizer 为
+`0 errors`、`0 bytes leaked`、退出码 0；这是可复用的同 dtype
+性能基线，不代表 half2 已验收。`softmax_fp16_half2` 的六处 TODO
+仍由学习者实现，当前 19 组按预期 FAIL、退出码 1；不要在正确性
+通过前使用它的 Benchmark 或 Profile 数字作性能结论。

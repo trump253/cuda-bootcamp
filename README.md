@@ -61,11 +61,14 @@ cuda-bootcamp/
     ├── v1.cu
     ├── v2.cu
     ├── v3.cu
+    ├── v3_fp16.cu
+    ├── softmax_fp16_harness.h
     ├── README.md
     ├── DAY9_V0_TASK.md
     ├── DAY9_V1_TASK.md
     ├── DAY9_V2_TASK.md
-    └── DAY9_V3_TASK.md
+    ├── DAY9_V3_TASK.md
+    └── DAY9_V3_FP16_TASK.md
 ```
 
 ## 当前进度
@@ -80,10 +83,10 @@ cuda-bootcamp/
   对照与 Notes 已完成，验收通过。
 
 Day 8 的验收记录位于 `06_fp16_half2/README.md`；Day 9 Softmax 的
-V0/V1/V2 已验收；V3 FP32 `float4` 已完成正确性、Benchmark 与
-最小 Profile，对不同形状未得到一致加速；对齐判断与性能 Notes
-也已记录。当前需清理 V3 的过时 TODO 注释，再继续计划中的
-FP16/half2 部分。详细进度见 `PROGRESS.md`。
+V0/V1/V2 已验收；V3 FP32 `float4` 已完成正确性、Benchmark、
+Profile 和 Notes，且已清理过时 TODO。当前进行计划中的
+FP16/half2 练习：标量 FP16 基线已通过，half2 核心仍留给学习者。
+详细进度见 `PROGRESS.md`。
 已学习的问题与答案持续整理在 `CUDA_复习与面试问答.md`。
 
 ## 构建与运行
@@ -91,10 +94,11 @@ FP16/half2 部分。详细进度见 `PROGRESS.md`。
 ```bash
 cmake -S . -B build
 cmake --build build -j
-./build/softmax_v3 --correctness-only
+./build/softmax_fp16_scalar --correctness-only
 ```
 
-通常会注释已完成练习的 CMake target；当前保留 Day 9 的 V2/V3 目标用于对照。
+通常会注释已完成练习的 CMake target；当前保留 FP16 标量/half2
+两个目标用于同 dtype 对照。
 需要重新构建历史练习时，取消 `CMakeLists.txt` 中对应注释。
 项目级 CUDA 编译架构默认是 `sm_75`（RTX 2080 Ti）：所有通过本项目 CMake
 构建的 CUDA target 都会使用它，包括重新启用的历史 target。它不影响在项目外
@@ -103,14 +107,14 @@ cmake --build build -j
 只构建当前练习：
 
 ```bash
-cmake --build build --target softmax_v2 softmax_v3 -j
+cmake --build build --target softmax_fp16_scalar softmax_fp16_half2 -j
 ```
 
 正确性完成后运行：
 
 ```bash
 compute-sanitizer --tool memcheck --leak-check full --error-exitcode 99 \
-  ./build/softmax_v3 --correctness-only
+  ./build/softmax_fp16_half2 --correctness-only
 ```
 
 ## 协作方式

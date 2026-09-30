@@ -81,9 +81,19 @@ endfunction()
 # add_executable(softmax_v1 07_softmax/v1.cu)
 # target_include_directories(softmax_v1 PRIVATE common 07_softmax)
 
-# Day 9：保留 V2 基线与已实现的 V3 float4 版，供同配置对照。
-add_executable(softmax_v2 07_softmax/v2.cu)
-target_include_directories(softmax_v2 PRIVATE common 07_softmax)
+# Day 9 FP32 已完成；需要复查 V2/V3 对照时取消以下四行注释。
+# add_executable(softmax_v2 07_softmax/v2.cu)
+# target_include_directories(softmax_v2 PRIVATE common 07_softmax)
+# add_executable(softmax_v3 07_softmax/v3.cu)
+# target_include_directories(softmax_v3 PRIVATE common 07_softmax)
 
-add_executable(softmax_v3 07_softmax/v3.cu)
-target_include_directories(softmax_v3 PRIVATE common 07_softmax)
+# Day 9 FP16：同一源码分别构建标量基线与 half2 练习版。
+function(add_softmax_fp16_target target_name use_half2)
+    add_executable(${target_name} 07_softmax/v3_fp16.cu)
+    target_include_directories(${target_name} PRIVATE common 07_softmax)
+    target_compile_definitions(
+        ${target_name} PRIVATE SOFTMAX_FP16_USE_HALF2=${use_half2})
+endfunction()
+
+add_softmax_fp16_target(softmax_fp16_scalar 0)
+add_softmax_fp16_target(softmax_fp16_half2 1)

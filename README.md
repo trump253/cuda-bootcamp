@@ -80,9 +80,9 @@ cuda-bootcamp/
   对照与 Notes 已完成，验收通过。
 
 Day 8 的验收记录位于 `06_fp16_half2/README.md`；Day 9 Softmax 的
-V0/V1/V2 已验收，当前由学习者完成 V3 FP32 `float4` 向量化读取。
-详细进度见 `PROGRESS.md`；V3 模板的向量化 TODO 尚未实现，正确性测试
-预期失败，不能把模板编译成功当作验收。
+V0/V1/V2 已验收；V3 FP32 `float4` 已完成正确性、Benchmark 与
+最小 Profile，对不同形状未得到一致加速。当前由学习者整理 V3 的
+对齐判断与性能 Notes；详细进度见 `PROGRESS.md`。
 已学习的问题与答案持续整理在 `CUDA_复习与面试问答.md`。
 
 ## 构建与运行

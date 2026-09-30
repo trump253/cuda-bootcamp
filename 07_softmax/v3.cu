@@ -1,6 +1,6 @@
-#include "softmax_harness.h"
-
 #include <cstdint>
+
+#include "softmax_harness.h"
 
 constexpr int kSoftmaxV3BlockSize = 256;
 constexpr int kSoftmaxV3WarpSize = 32;
@@ -43,6 +43,9 @@ __global__ void softmax_v3_kernel(const float* input, float* output,
     const bool aligned =
         reinterpret_cast<std::uintptr_t>(input_row) % alignof(float4) == 0 &&
         reinterpret_cast<std::uintptr_t>(output_row) % alignof(float4) == 0;
+    const float4* input_row4 = reinterpret_cast<const float4*>(input_row);
+    float4* output_row4 = reinterpret_cast<float4*>(output_row);
+
     const int vector_groups = hidden / kSoftmaxV3VectorWidth;
     const int tail_start = vector_groups * kSoftmaxV3VectorWidth;
 
@@ -58,11 +61,17 @@ __global__ void softmax_v3_kernel(const float* input, float* output,
         for (int group = tid; group < vector_groups;
              group += kSoftmaxV3BlockSize) {
             // TODO：在这里读取一个 float4，并更新 thread_max。
+            const float4 v = input_row4[group];
+            thread_max = fmaxf(thread_max, v.x);
+            thread_max = fmaxf(thread_max, v.y);
+            thread_max = fmaxf(thread_max, v.z);
+            thread_max = fmaxf(thread_max, v.w);
         }
         // TODO 2：处理 [tail_start, hidden) 中不足四个的标量元素。
         for (int col = tail_start + tid; col < hidden;
              col += kSoftmaxV3BlockSize) {
             // TODO：在这里更新 thread_max。
+            thread_max = fmaxf(thread_max, input_row[col]);
         }
     } else {
         for (int col = tid; col < hidden; col += kSoftmaxV3BlockSize) {
@@ -71,13 +80,16 @@ __global__ void softmax_v3_kernel(const float* input, float* output,
     }
 
     const float local_warp_max = warp_reduce_max_v3(thread_max);
-    if (lane == 0) warp_max[warp] = local_warp_max;
+    if (lane == 0)
+        warp_max[warp] = local_warp_max;
     __syncthreads();
     if (warp == 0) {
         const float partial = lane < kSoftmaxV3WarpsPerBlock
-                                  ? warp_max[lane] : -INFINITY;
+                                  ? warp_max[lane]
+                                  : -INFINITY;
         const float max_val = warp_reduce_max_v3(partial);
-        if (lane == 0) row_max_shared = max_val;
+        if (lane == 0)
+            row_max_shared = max_val;
     }
     __syncthreads();
     const float row_max = row_max_shared;
@@ -88,11 +100,17 @@ __global__ void softmax_v3_kernel(const float* input, float* output,
         for (int group = tid; group < vector_groups;
              group += kSoftmaxV3BlockSize) {
             // TODO：在这里读取一个 float4，并更新 thread_sum。
+            const float4 v = input_row4[group];
+            thread_sum += expf(v.x - row_max);
+            thread_sum += expf(v.y - row_max);
+            thread_sum += expf(v.z - row_max);
+            thread_sum += expf(v.w - row_max);
         }
         // TODO 4：将尾部标量元素计入 thread_sum。
         for (int col = tail_start + tid; col < hidden;
              col += kSoftmaxV3BlockSize) {
             // TODO：在这里更新 thread_sum。
+            thread_sum += expf(input_row[col] - row_max);
         }
     } else {
         for (int col = tid; col < hidden; col += kSoftmaxV3BlockSize) {
@@ -101,13 +119,16 @@ __global__ void softmax_v3_kernel(const float* input, float* output,
     }
 
     const float local_warp_sum = warp_reduce_sum_v3(thread_sum);
-    if (lane == 0) warp_sum[warp] = local_warp_sum;
+    if (lane == 0)
+        warp_sum[warp] = local_warp_sum;
     __syncthreads();
     if (warp == 0) {
         const float partial = lane < kSoftmaxV3WarpsPerBlock
-                                  ? warp_sum[lane] : 0.0f;
+                                  ? warp_sum[lane]
+                                  : 0.0f;
         const float sum_val = warp_reduce_sum_v3(partial);
-        if (lane == 0) row_sum_shared = sum_val;
+        if (lane == 0)
+            row_sum_shared = sum_val;
     }
     __syncthreads();
     const float inv_sum = 1.0f / row_sum_shared;
@@ -118,11 +139,19 @@ __global__ void softmax_v3_kernel(const float* input, float* output,
         for (int group = tid; group < vector_groups;
              group += kSoftmaxV3BlockSize) {
             // TODO：在这里写回这个 group 的四个输出。
+            const float4 input_v = input_row4[group];
+            float4 output_v;
+            output_v.x = expf(input_v.x - row_max) * inv_sum;
+            output_v.y = expf(input_v.y - row_max) * inv_sum;
+            output_v.z = expf(input_v.z - row_max) * inv_sum;
+            output_v.w = expf(input_v.w - row_max) * inv_sum;
+            output_row4[group] = output_v;
         }
         // TODO 6：写回尾部标量元素，不得遗漏或越界。
         for (int col = tail_start + tid; col < hidden;
              col += kSoftmaxV3BlockSize) {
             // TODO：在这里写回 output_row[col]。
+            output_row[col] = expf(input_row[col] - row_max) * inv_sum;
         }
     } else {
         for (int col = tid; col < hidden; col += kSoftmaxV3BlockSize) {

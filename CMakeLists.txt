@@ -81,7 +81,7 @@ endfunction()
 # add_executable(softmax_v1 07_softmax/v1.cu)
 # target_include_directories(softmax_v1 PRIVATE common 07_softmax)
 
-# Day 9：保留 V2 基线，与学习者待完成的 V3 float4 版对照。
+# Day 9：保留 V2 基线与已实现的 V3 float4 版，供同配置对照。
 add_executable(softmax_v2 07_softmax/v2.cu)
 target_include_directories(softmax_v2 PRIVATE common 07_softmax)
 

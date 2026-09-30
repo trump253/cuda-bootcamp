@@ -1,4 +1,8 @@
-# Day 9 当前任务：Softmax V3 FP32 `float4`
+# Day 9 V3 FP32 `float4` 任务说明
+
+本文件保留原练习要求；学习者已完成六处 TODO 的实现、正确性和
+初轮 Benchmark/Profile。当前实测结论见 `README.md`，概念解释与
+Notes 仍需整理。下文的“你需要完成”和“模板失败”描述原任务阶段。
 
 ## 今天只需理解什么
 
@@ -46,7 +50,7 @@ CUDA_VISIBLE_DEVICES=0 compute-sanitizer --tool memcheck --leak-check full \
 echo $?
 ```
 
-当前模板虽可编译，但对齐行的六处 TODO 尚未完成，正确性测试预期
+原模板虽可编译，但对齐行的六处 TODO 尚未完成，正确性测试预期
 `FAIL`、退出码 1；这不是 V3 验收结果。完成后要求全部 19 个 shape
 `PASS`、两个退出码均为 0，Sanitizer 为 `0 errors`、`0 bytes leaked`。
 重点检查 `(1,1)`、`(1,2)`、`(1,31)`：对齐行只有尾部或有三元素

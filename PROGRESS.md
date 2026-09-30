@@ -469,23 +469,39 @@ Day 9 — V0/V1/V2 Softmax 已完成闭环；当前进行 V3 FP32 float4 练习
   退出码为 0，Compute Sanitizer 为 0 errors、0 bytes leaked。
   V3 未填写 TODO 时 19 组均按预期 FAIL、退出码为 1，因此目前
   只是任务模板，尚未达到正确性或性能验收。
+- 学习者已完成 V3 FP32 `float4` 主体和尾部实现；19 组正确性全部
+  PASS、退出码 0，Compute Sanitizer 为 0 errors、0 bytes leaked。
+  本地重新构建、正确性与 memcheck 复验一致。
+- V2/V3 交替三轮 Event 对照：`(128,4096)` 平均分别为
+  `0.006681/0.006811 ms`，V3 约慢 1.95%；`(16,512)` V3
+  约快 5.24%，不同尺寸没有一致收益。一次 ncu 对照中 V3 的
+  global-load request 为 V2 的四分之一（49152→12288），
+  sector 均为 196608；只证明请求粒度改变，不证明 DRAM 字节数减少。
 
 ## 当前问题
 
-- V3 对齐行的六处向量化与尾部 TODO 尚未实现；正确性失败是模板预期。
-- `float4` 是否改善实际访存指令数及 latency，仍需学习者完成实现后实测。
+- V3 的正确性、最小 Benchmark/Profile 已完成，但性能并无一致加速；
+  目前不能单独归因于指数计算、规约或额外指令。源码中的模板 TODO
+  注释尚未清理，不影响功能但不应留在最终归档中。
+- 学习者对“`hidden` 必须是 4 的倍数才能走 aligned 路径”的表述
+  需要改为按实际行首地址判断；最终 Notes/概念验收待完成。
 
 ## 今日关键知识
 
 - `float4` 每组覆盖四个相邻 FP32 元素；必须检查行首实际地址的
   16 字节对齐，尾部不足四个元素不能直接用完整 `float4` 读取。
+- 某行是否对齐还取决于 `row`：基址对齐时条件为
+  `(row * hidden) % 4 == 0`。`hidden % 4 == 0` 足以保证所有行
+  对齐，但不是某一行对齐的必要条件。
 - 对照 V2/V3 时固定 dtype、block、规约算法和测试口径，先验证正确性，
   再用 Event 与 Profile 判断访存变化和性能收益。
+- 本次 V3 的 L1/TEX global-load request 降为四分之一，但每请求
+  sector 从 4 增到 16、总 sector 不变；请求数下降不等于整体加速。
 
 ## 下一任务
 
-- 学习者完成 `07_softmax/v3.cu` 的六处 TODO：对齐行的 `float4`
-  求最大值、指数和、归一化写回及各自尾部处理；先通过正确性与
-  Compute Sanitizer，再与 V2 做同配置三轮 Benchmark 和最小 Profile。
+- 学习者用 `hidden=33` 举例说明哪些行走 `float4`、哪些行走
+  标量路径，再解释为何 request 降四倍而 sector 不变、延迟未稳定
+  改善；随后清理已完成 TODO，形成 V3 FP32 Notes。
   FP16/half2 留在 FP32 阶段闭环后再评估，不提前扩展。
   暂存变体的 Sanitizer 摘要若补发，再补记其安全复验状态。

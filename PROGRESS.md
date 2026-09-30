@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 9 — V3 FP32 float4 与 FP16 half2 练习已闭环；待按计划开展 Day 10 Nsight Systems，最终独立 Softmax 验收尚未进行
+Day 10 — Nsight Systems 时间线练习框架已就绪；学习者尚未采集和解释三份正式报告，最终独立 Softmax 验收尚未进行
 
 ## 已完成
 
@@ -505,12 +505,20 @@ Day 9 — V3 FP32 float4 与 FP16 half2 练习已闭环；待按计划开展 Day
   为 49152/24576，sector 均为 98304，Profile 时间为 8.51/8.45 µs。
   request 减半只说明访存分组变化，不说明读取字节数或 DRAM 流量减半。
   V3 FP16 的正确性、Benchmark、Profile、Notes 已闭环。
+- 已建立 Day 10 中文任务说明和学习者填写的时间线记录模板；复用
+  Vector Add、Softmax V2 与 Reduction V3，不新增学习者需要实现的 kernel。
+- 已给 Reduction V3 添加仅精简主机测试流程的 `--timeline` 入口：
+  `N=1048579` 依次产生 `4097 → 17 → 1` 个 partial sum。三个
+  Day 10 目标构建、直接运行均通过；`--timeline` 输出 `passes=3`、
+  `abs_error=0`、`PASS`。
+- 本机检测到 Nsight Systems 2022.4.2.50；冒烟采集成功生成
+  `.nsys-rep`，`cudaapitrace`、`gputrace`、`kernexectrace` 报表
+  命令均可运行。冒烟检查只验证工具链，不替代学习者的正式采集与分析。
 
 ## 当前问题
 
-- FP16 half2 没有稳定优于同 dtype 标量版；不再为了追求“必须更快”
-  而扩展本节优化。最终独立 Softmax 验收与 Day 10/11 的计划项目
-  尚未完成，不能宣告 Bootcamp 毕业。
+- Day 10 的三份正式报告与四个时间线问题仍待学习者完成；
+  Day 11 与最终独立 Softmax 验收尚未进行。
 
 ## 今日关键知识
 
@@ -541,11 +549,16 @@ Day 9 — V3 FP32 float4 与 FP16 half2 练习已闭环；待按计划开展 Day
 - half2 把 global-load request 减半，但每请求覆盖 sector 从 2
   增至 4，总 sector 不变；Event 的快慢依形状而异，不能把
   request 减少直接等同于整体速度收益。
+- Nsight Systems 区分 CPU 上的 CUDA API 调用与 GPU 上的 kernel/
+  数据传输：两侧时间段不是同一个概念。第一次 CUDA 调用可能含
+  上下文初始化或模块加载，不宜当作稳态 launch overhead。
+- Reduction V3 的多轮规约在同一 stream 中顺序执行；Day 10 要
+  通过实际时间线确认三轮顺序与 gap，并把“观察到 gap”和
+  “解释 gap 的具体原因”区分开。
 
 ## 下一任务
 
-- 按计划转入 Day 10 Nsight Systems：对 Vector Add、Softmax 和多 kernel
-  sequence 观察 CPU launch、H2D/D2H、kernel gap 与执行顺序，
-  由学习者亲自采集时间线和解释。Day 11 再整理单 kernel Nsight
-  Compute 对照。之后按计划进行“从空文件独立实现”的最终 Softmax
-  验收；此处不提前宣告通过。
+- 学习者按照 `08_nsys/README.md` 亲自采集 Vector Add、Softmax V2、
+  Reduction V3 三份报告，填写 `08_nsys/NOTES.md`，提交关键截图
+  或 CLI 片段及四个问题的答案供 Review。达到 Day 10 验收后再进入
+  Day 11 单 kernel Nsight Compute 对照。

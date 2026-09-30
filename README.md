@@ -55,20 +55,23 @@ cuda-bootcamp/
 │   ├── half2.cu
 │   ├── README.md
 │   └── DAY8_TASK.md
-└── 07_softmax/
-    ├── softmax_harness.h
-    ├── v0.cu
-    ├── v1.cu
-    ├── v2.cu
-    ├── v3.cu
-    ├── v3_fp16.cu
-    ├── softmax_fp16_harness.h
+├── 07_softmax/
+│   ├── softmax_harness.h
+│   ├── v0.cu
+│   ├── v1.cu
+│   ├── v2.cu
+│   ├── v3.cu
+│   ├── v3_fp16.cu
+│   ├── softmax_fp16_harness.h
+│   ├── README.md
+│   ├── DAY9_V0_TASK.md
+│   ├── DAY9_V1_TASK.md
+│   ├── DAY9_V2_TASK.md
+│   ├── DAY9_V3_TASK.md
+│   └── DAY9_V3_FP16_TASK.md
+└── 08_nsys/
     ├── README.md
-    ├── DAY9_V0_TASK.md
-    ├── DAY9_V1_TASK.md
-    ├── DAY9_V2_TASK.md
-    ├── DAY9_V3_TASK.md
-    └── DAY9_V3_FP16_TASK.md
+    └── NOTES.md
 ```
 
 ## 当前进度
@@ -81,12 +84,11 @@ cuda-bootcamp/
 - Day 7 GEMM：Naive/Tiled 两版闭环、cuBLAS 对照与结果解释已验收。
 - Day 8 FP16/half2：正确性、memcheck、同配置三轮 Benchmark、Nsight Compute
   对照与 Notes 已完成，验收通过。
+- Day 9 Softmax V0–V3：FP32 `float4` 与 FP16 `half2` 均完成闭环；
+  向量化未获得所有形状上一致的性能收益。
 
-Day 8 的验收记录位于 `06_fp16_half2/README.md`；Day 9 Softmax 的
-V0/V1/V2 已验收；V3 FP32 `float4` 与 FP16 `half2` 的正确性、
-Benchmark、Profile 和 Notes 也已闭环。half2 对照未显示所有形状的
-一致加速。下一步按计划进行 Day 10 Nsight Systems；Bootcamp
-最终独立 Softmax 验收尚未完成。
+当前进行 [Day 10 Nsight Systems 时间线练习](08_nsys/README.md)。
+Bootcamp 最终独立 Softmax 验收尚未完成。
 详细进度见 `PROGRESS.md`。
 已学习的问题与答案持续整理在 `CUDA_复习与面试问答.md`。
 
@@ -94,29 +96,19 @@ Benchmark、Profile 和 Notes 也已闭环。half2 对照未显示所有形状�
 
 ```bash
 cmake -S . -B build
-cmake --build build -j
-./build/softmax_fp16_scalar --correctness-only
+cmake --build build --target vector_add softmax_v2 reduction_v3 -j 8
+./build/reduction_v3 --timeline
 ```
 
-通常会注释已完成练习的 CMake target；当前保留 FP16 标量/half2
-两个目标用于同 dtype 对照。
+通常会注释已完成练习的 CMake target；当前仅启用 Day 10 所需的
+Vector Add、Softmax V2 与 Reduction V3。
 需要重新构建历史练习时，取消 `CMakeLists.txt` 中对应注释。
 项目级 CUDA 编译架构默认是 `sm_75`（RTX 2080 Ti）：所有通过本项目 CMake
 构建的 CUDA target 都会使用它，包括重新启用的历史 target。它不影响在项目外
 直接调用 `nvcc` 的命令；换 GPU 时可覆盖 CMake 变量 `CUDA_BOOTCAMP_ARCH`。
 
-只构建当前练习：
-
-```bash
-cmake --build build --target softmax_fp16_scalar softmax_fp16_half2 -j
-```
-
-正确性完成后运行：
-
-```bash
-compute-sanitizer --tool memcheck --leak-check full --error-exitcode 99 \
-  ./build/softmax_fp16_half2 --correctness-only
-```
+三个采集命令、CLI 报表与记录模板见 `08_nsys/README.md` 和
+`08_nsys/NOTES.md`；Day 10 主要任务是学习者亲自分析时间线。
 
 ## 协作方式
 

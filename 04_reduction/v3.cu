@@ -283,8 +283,15 @@ int main(int argc, char** argv) {
                    ? EXIT_SUCCESS
                    : EXIT_FAILURE;
     }
+    if (argc == 2 && std::strcmp(argv[1], "--timeline") == 0) {
+        // Day 10：只运行一次多轮规约，保留 H2D、各轮 kernel 与 D2H。
+        // 目标尺寸依次产生 4097、17、1 个 partial sum。
+        return run_correctness_case((1U << 20) + 3, kBlockSize)
+                   ? EXIT_SUCCESS
+                   : EXIT_FAILURE;
+    }
     if (argc != 1) {
-        std::fprintf(stderr, "用法：%s [--profile]\n", argv[0]);
+        std::fprintf(stderr, "用法：%s [--profile|--timeline]\n", argv[0]);
         return EXIT_FAILURE;
     }
 

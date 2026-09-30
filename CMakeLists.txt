@@ -16,9 +16,9 @@ set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 set(CUDA_BOOTCAMP_ARCH "sm_75" CACHE STRING "本工程的 CUDA 编译目标架构")
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-arch=${CUDA_BOOTCAMP_ARCH}>)
 
-# Day 1 已完成；需要复查时取消以下两行注释。
-# add_executable(vector_add 01_vector_add/main.cu)
-# target_include_directories(vector_add PRIVATE common)
+# Day 10 时间线练习：复用已验收的 Day 1 Vector Add。
+add_executable(vector_add 01_vector_add/main.cu)
+target_include_directories(vector_add PRIVATE common)
 
 # Day 2 已完成；需要复查时取消以下两行注释。
 # add_executable(matrix_add 02_matrix_add/main.cu)
@@ -47,12 +47,13 @@ endfunction()
 # add_executable(reduction_v1 04_reduction/v1.cu)
 # target_include_directories(reduction_v1 PRIVATE common)
 
-# Reduction V2/V3 已完成；需要复查 Profile 时取消以下四行注释。
+# Reduction V2 已完成；需要复查 Profile 时取消以下两行注释。
 # add_executable(reduction_v2 04_reduction/v2.cu)
 # target_include_directories(reduction_v2 PRIVATE common)
 
-# add_executable(reduction_v3 04_reduction/v3.cu)
-# target_include_directories(reduction_v3 PRIVATE common)
+# Day 10 时间线练习：复用 V3 的多轮依赖规约。
+add_executable(reduction_v3 04_reduction/v3.cu)
+target_include_directories(reduction_v3 PRIVATE common)
 
 # Day 7 已完成；需要复查时取消以下目标的注释。
 # add_executable(gemm_naive 05_gemm/naive.cu)
@@ -81,13 +82,14 @@ endfunction()
 # add_executable(softmax_v1 07_softmax/v1.cu)
 # target_include_directories(softmax_v1 PRIVATE common 07_softmax)
 
-# Day 9 FP32 已完成；需要复查 V2/V3 对照时取消以下四行注释。
-# add_executable(softmax_v2 07_softmax/v2.cu)
-# target_include_directories(softmax_v2 PRIVATE common 07_softmax)
+# Day 10 时间线练习：复用已验收的 Softmax V2。
+add_executable(softmax_v2 07_softmax/v2.cu)
+target_include_directories(softmax_v2 PRIVATE common 07_softmax)
+# Day 9 FP32 V3 已完成；需要复查时取消以下两行注释。
 # add_executable(softmax_v3 07_softmax/v3.cu)
 # target_include_directories(softmax_v3 PRIVATE common 07_softmax)
 
-# Day 9 FP16：同一源码分别构建标量基线与 half2 练习版。
+# Day 9 FP16 已完成；同一源码可重新构建标量基线与 half2 练习版。
 function(add_softmax_fp16_target target_name use_half2)
     add_executable(${target_name} 07_softmax/v3_fp16.cu)
     target_include_directories(${target_name} PRIVATE common 07_softmax)
@@ -95,5 +97,5 @@ function(add_softmax_fp16_target target_name use_half2)
         ${target_name} PRIVATE SOFTMAX_FP16_USE_HALF2=${use_half2})
 endfunction()
 
-add_softmax_fp16_target(softmax_fp16_scalar 0)
-add_softmax_fp16_target(softmax_fp16_half2 1)
+# add_softmax_fp16_target(softmax_fp16_scalar 0)
+# add_softmax_fp16_target(softmax_fp16_half2 1)

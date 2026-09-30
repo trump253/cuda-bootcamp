@@ -298,6 +298,10 @@ Day 9 — V2 Warp Shuffle Softmax 已完成正确性与性能闭环；下一步�
   V2 两项均为 `128×2×9=2304`。这里是 warp 级指令数，
   不是逐线程访存元素数，也不是实际 shared 请求字节数。V2 的
   Reference、Correctness、Benchmark、Profile、Notes 闭环验收完成。
+- 已澄清 V2 最终行标量读取的广播范围：同一 warp 的 lane 可从
+  一条 shared load 获得同一值，但 8 个 warp 仍各执行一条读指令；
+  V1 公式中的外层 `8` 是每 block 的 warp 数，括号中的 `8`
+  是 tree 规约轮数，带谓词的指令计数不同于真正参与的线程数。
 
 ## 当前任务
 
@@ -447,6 +451,10 @@ Day 9 — V2 Warp Shuffle Softmax 已完成正确性与性能闭环；下一步�
   级 SASS 指令；当前 V1 的带谓词 tree 指令可由 warp 发出，
   即使部分 lane 的谓词为假。V2 每次规约每 block 只有 9 条
   shared load 与 9 条 store 指令，不能把这些数解释为字节数。
+- Shared memory 广播只发生在同一 warp 的请求内：多个 lane 读
+  同一地址不会形成 bank conflict，但不会把不同 warp 的 8 条
+  load 指令合成一条。V1 的 load 公式括号 `8×2+1` 分别对应
+  8 轮、每轮 2 条 shared load、最终 1 条标量 load。
 
 ## 下一任务
 

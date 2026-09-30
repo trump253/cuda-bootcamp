@@ -724,3 +724,24 @@ V1 `if (tid<stride)` 中实际参与的 warp 会随 stride 减少，不能把
 和对应 store 指标；它们与 `_pred_on_any` 区分整 warp 谓词关闭和
 至少一个 lane 有效。NVIDIA 对 warp 级执行指令的定义见
 [Nsight Compute 指标说明](https://docs.nvidia.com/nsight-compute/NsightCompute/)。
+
+### V2 的 8 个 warp 都读同一个 shared 标量，广播后为什么仍是 8 条 load？
+
+广播只解决**同一个 warp 内**多个 lane 读同一 shared 地址的服务问题：
+该 warp 发出一条 load 指令，shared memory 可把同一个值提供给
+参与的 lane，不因此产生 bank conflict。它不会替其他 warp 执行
+指令。当前 block 有 8 个 warp，`row_max_shared` 或
+`row_sum_shared` 由整个 block 读取时，各 warp 各发出一条 load，
+因此 ncu 的 warp 指令计数是 `8`，不是 `1`，也不是按 256 个线程
+计数。这个计数本身不等于物理请求次数或读取字节数。广播规则见
+[NVIDIA CUDA shared-memory 访问说明](https://docs.nvidia.com/cuda/cuda-programming-guide/02-basics/writing-cuda-kernels.html)。
+
+再拆开 V1 的公式：`128 × 2 × 8 × (8×2+1)` 中，依次是
+128 个 block、max/sum 两次规约、每 block 8 个 warp；括号内的
+`8×2` 是 8 轮 tree 中每个 warp 每轮执行两条带谓词的 shared
+load，`+1` 是最终读行标量。store 公式 `128 × 2 × 8 × (1+8)`
+的 `1` 是每 warp 初始化局部值的一次 store，`8` 是 tree 的
+8 轮各一次 store。以 stride=16 为例，只有 warp 0 的前 16 个
+lane 真的操作数据；当前编译得到的指令指标仍可计入其他 warp
+执行但所有 lane 谓词为假的 load/store。`inst_executed` 不等于
+有效访存线程数。

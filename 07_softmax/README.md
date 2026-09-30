@@ -216,11 +216,24 @@ max/sum 两次规约。计数单位是执行过的 **warp 级 SASS 指令**，�
   `128 × 2 × 8 × (1 init store + 8 轮 × 1 store)=18432 inst`。
   部分 warp 的条件为假，仍可计入此处的指令数，不代表都产生有效
   shared-memory 请求。
+- V1 公式中最外面的 `128` 是 block 数，`2` 是 max/sum 两次规约，
+  外面的 `8` 是每个 block 的 8 个 warp。load 括号里的 `8×2+1`
+  是“8 轮 tree、每轮 2 条 load，再加最后 1 条标量 load”，
+  store 括号里的 `1+8` 是“1 条初始化 store、8 轮各 1 条 store”。
+  例如 stride=16 时仅 warp 0 的前 16 个 lane 真正访问数据，但
+  此处指标仍会计入其余 warp 执行的全谓词关闭指令。
 - V2 每次规约：8 个 warp 各写 1 个 partial，再由 warp 0 写 1 个
   行标量，所以每 block 有 `9` 条 warp store；warp 0 读取 8 个
   partial 对应 `1` 条 warp load，随后 8 个 warp 各读取行标量一次，
   共 `9` 条 warp load。两次规约、128 个 block 给出
   `128 × 2 × 9 = 2304 inst`，与 load/store 两项实测均一致。
+
+V2 最后一步所有线程读同一个 `row_max_shared`/`row_sum_shared`：
+**同一 warp 内**的 32 个 lane 读同一地址可广播，不会变成 32 条
+warp load，也不会因相同地址产生 bank conflict；但 broadcast
+不把 8 个 warp 合并成一条指令。8 个 warp 各发一条 shared-load
+指令，所以每次规约在这里仍计 `8`，而不是 `1` 或 `256`。
+参见 [NVIDIA CUDA shared-memory 访问说明](https://docs.nvidia.com/cuda/cuda-programming-guide/02-basics/writing-cuda-kernels.html)。
 
 上述公式依赖当前编译结果；改源码、编译参数或架构后，不能保证
 仍是相同指令数。若要区别“warp 发出了带谓词的指令”与“至少一个

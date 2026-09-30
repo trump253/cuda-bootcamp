@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 9 — V0/V1/V2 Softmax 已完成闭环；当前进行 V3 FP32 float4 练习
+Day 9 — V3 FP32 float4 已完成测试与 Notes；清理注释后评估 FP16/half2
 
 ## 已完成
 
@@ -477,14 +477,16 @@ Day 9 — V0/V1/V2 Softmax 已完成闭环；当前进行 V3 FP32 float4 练习
   约快 5.24%，不同尺寸没有一致收益。一次 ncu 对照中 V3 的
   global-load request 为 V2 的四分之一（49152→12288），
   sector 均为 196608；只证明请求粒度改变，不证明 DRAM 字节数减少。
+- 学习者已正确推导 `hidden=33` 时 row 0～5 的路径分别为
+  向量化/标量/标量/标量/向量化/标量，并解释向量化减少 request、
+  逻辑输入量不变。结合实测的 4→16 sector/request 和总 sector
+  不变，V3 FP32 的概念解释与 Notes 已完成；负收益如实保留。
 
 ## 当前问题
 
 - V3 的正确性、最小 Benchmark/Profile 已完成，但性能并无一致加速；
   目前不能单独归因于指数计算、规约或额外指令。源码中的模板 TODO
   注释尚未清理，不影响功能但不应留在最终归档中。
-- 学习者对“`hidden` 必须是 4 的倍数才能走 aligned 路径”的表述
-  需要改为按实际行首地址判断；最终 Notes/概念验收待完成。
 
 ## 今日关键知识
 
@@ -497,11 +499,12 @@ Day 9 — V0/V1/V2 Softmax 已完成闭环；当前进行 V3 FP32 float4 练习
   再用 Event 与 Profile 判断访存变化和性能收益。
 - 本次 V3 的 L1/TEX global-load request 降为四分之一，但每请求
   sector 从 4 增到 16、总 sector 不变；请求数下降不等于整体加速。
+- 逻辑读取字节数不变本身不能保证所有实现的 sector 数都相同；
+  本次 sector 相同还与两版对齐且覆盖相同输入区域的访问模式相符。
 
 ## 下一任务
 
-- 学习者用 `hidden=33` 举例说明哪些行走 `float4`、哪些行走
-  标量路径，再解释为何 request 降四倍而 sector 不变、延迟未稳定
-  改善；随后清理已完成 TODO，形成 V3 FP32 Notes。
-  FP16/half2 留在 FP32 阶段闭环后再评估，不提前扩展。
+- 学习者清理 `07_softmax/v3.cu` 已完成项的过时 TODO 注释，保留
+  必要的对齐、尾部和规约说明。随后按计划评估 V3 的 FP16/half2
+  合理向量化练习；核心 kernel 仍由学习者实现。
   暂存变体的 Sanitizer 摘要若补发，再补记其安全复验状态。

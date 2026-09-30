@@ -81,8 +81,9 @@ cuda-bootcamp/
 
 Day 8 的验收记录位于 `06_fp16_half2/README.md`；Day 9 Softmax 的
 V0/V1/V2 已验收；V3 FP32 `float4` 已完成正确性、Benchmark 与
-最小 Profile，对不同形状未得到一致加速。当前由学习者整理 V3 的
-对齐判断与性能 Notes；详细进度见 `PROGRESS.md`。
+最小 Profile，对不同形状未得到一致加速；对齐判断与性能 Notes
+也已记录。当前需清理 V3 的过时 TODO 注释，再继续计划中的
+FP16/half2 部分。详细进度见 `PROGRESS.md`。
 已学习的问题与答案持续整理在 `CUDA_复习与面试问答.md`。
 
 ## 构建与运行

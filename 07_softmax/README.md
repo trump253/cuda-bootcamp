@@ -3,8 +3,8 @@
 本节输入、输出均为行主序 FP32 矩阵，形状 `[rows, hidden]`。每一行独立执行
 Softmax。按计划依次完成 V0 逐行朴素版、V1 Shared Memory、V2 Warp Shuffle、
 V3 合理向量化；每版都要有正确性、Benchmark 与必要的 Profile 证据，不能只凭
-源码推断加速。V0/V1/V2 已验收；V3 FP32 `float4` 的正确性与
-测量已完成，概念解释和 Notes 待最终整理。
+源码推断加速。V0/V1/V2 已验收；V3 FP32 `float4` 已完成正确性、
+测量与 Notes，性能收益并未在所有形状成立。
 
 ## 当前文件
 
@@ -291,6 +291,8 @@ ncu 时长与正常 Event 时长分开使用，不混算绝对值。
 但不是某一行对齐的必要条件。尾部不足四元素，不得直接做
 完整 `float4` 访问，否则可能跨入下一行或越过分配范围。
 
-V3 FP32 已完成正确性、Benchmark 与最小 Profile；性能收益并未
-在所有形状成立。下一步先由学习者复述对齐判定与
-request/sector 的关系，再整理 Notes；暂不进入最终验收。
+学习者已正确给出 `hidden=33` 时 row 0～5 的路径：向量化、
+标量、标量、标量、向量化、标量，并理解本次 request 降四倍
+但 sector 总数不变。V3 FP32 的正确性、Benchmark、最小 Profile
+与 Notes 已闭环；源码中尚有已完成项的模板 TODO 注释待清理。
+FP16/half2 部分及 Bootcamp 最终验收均尚未完成。

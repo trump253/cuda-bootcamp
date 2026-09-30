@@ -1,8 +1,9 @@
 # Day 9 V3 FP32 `float4` 任务说明
 
 本文件保留原练习要求；学习者已完成六处 TODO 的实现、正确性和
-初轮 Benchmark/Profile。当前实测结论见 `README.md`，概念解释与
-Notes 仍需整理。下文的“你需要完成”和“模板失败”描述原任务阶段。
+初轮 Benchmark/Profile，概念解释与 Notes 见 `README.md`；
+源码仍有过时 TODO 注释待清理。下文的“你需要完成”和“模板失败”
+描述原任务阶段。
 
 ## 今天只需理解什么
 

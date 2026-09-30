@@ -783,3 +783,13 @@ CPU Reference 计算。核内 max、`expf`、指数和与归一化用 FP32，
 `half2` 在这一练习里只改变成对读取/写回，不把 `__hadd2` 当作
 Softmax 规约。标量 FP16 与 half2 保持相同 dtype 和算术精度，
 才能较干净地比较访存分组变化；是否更快仍需 Event/Profile 证据。
+
+### 为什么 half2 Softmax 的奇数列会失败，却有个别奇数形状仍显示 PASS？
+
+本次初版在对齐行的指数和尾部循环里把 `expf(x-row_max)` 加进了
+`thread_max`，随后参与 sum 规约的却是 `thread_sum`。这样分母
+漏掉最后一个未配对的 half：`hidden=1` 时没有任何完整 pair，
+`thread_sum=0`，归一化无效；其他奇数列的行和会偏离 1。
+某个测试仍 PASS，只能说明漏掉的尾部贡献在该输入下未超过当前
+误差阈值，不能证明尾部逻辑正确。先核对 max/sum/write 三个阶段的
+尾部各自更新了正确变量，再复测正确性与内存安全，而不是放宽精度。

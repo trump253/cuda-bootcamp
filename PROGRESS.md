@@ -491,11 +491,16 @@ Day 9 — V3 FP32 float4 已归档；当前进行 FP16 存储与 half2 成对访
   19 组正确性全部 PASS、退出码 0，Compute Sanitizer 为 0 errors、
   0 bytes leaked、退出码 0。half2 模板的六处 TODO 尚未实现，
   19 组按预期 FAIL、退出码 1，未进行性能验收。
+- 学习者提交 half2 初版后有 15/19 组 PASS，`(1,1)`、`(16,33)`、
+  `(128,257)`、`(129,33)` 失败。Review 定位到 aligned 分支的
+  指数和尾部循环误将 `expf(...)` 加到 `thread_max`，而实际规约
+  `thread_sum`；这是漏算尾部导致的分母错误，不是 FP16 阈值过严。
 
 ## 当前问题
 
-- FP16 half2 的成对读取、FP32 局部计算和成对写回尚未实现；
-  Benchmark/Profile 只能在正确性和 Sanitizer 通过后进行。
+- FP16 half2 的成对读取/写回已填，但指数和尾部误更新局部 max，
+  需学习者修正并重新完成 19 组正确性与 Compute Sanitizer。
+  在此之前不使用 Benchmark/Profile 判断性能。
 - FP32 `float4` 版的性能没有一致收益，不能把这次负收益直接推广到
   FP16 half2；两者 dtype、每组宽度和数据量均不同。
 
@@ -516,10 +521,13 @@ Day 9 — V3 FP32 float4 已归档；当前进行 FP16 存储与 half2 成对访
   Softmax；核内以 FP32 求 max、`expf`、sum，最后写回才舍入为 FP16。
 - `half2` 的任务是成对访存，不是用 FP16 `__hadd2` 求指数和；
   输入/输出行首需满足 4 字节对齐，奇数列尾部用标量处理。
+- 尾部元素必须分别参与 max、指数和与写回；sum 阶段误写到
+  `thread_max` 会使分母漏掉尾部。`hidden=1` 时分母变为 0；
+  其他奇数列可能因尾部贡献很小而偶然通过阈值，不能因此认为正确。
 
 ## 下一任务
 
-- 学习者按 `07_softmax/DAY9_V3_FP16_TASK.md` 完成
-  `v3_fp16.cu` 的六处 half2 TODO；先交正确性与 Compute Sanitizer，
-  再与标量 FP16 基线做交替三轮 Benchmark 和最小 Profile。
+- 学习者修正 `v3_fp16.cu` 指数和尾部的累加目标，不调整误差阈值；
+  重新构建并提交 19 组正确性、退出码与 Compute Sanitizer 摘要。
+  全部通过后，再与标量 FP16 基线交替三轮 Benchmark、采集最小 Profile。
   暂存变体的 Sanitizer 摘要若补发，再补记其安全复验状态。

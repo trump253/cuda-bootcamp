@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 9 — V3 FP32 float4 已归档；当前进行 FP16 存储与 half2 成对访存
+Day 9 — V3 FP32 float4 与 FP16 half2 练习已闭环；待按计划开展 Day 10 Nsight Systems，最终独立 Softmax 验收尚未进行
 
 ## 已完成
 
@@ -495,14 +495,22 @@ Day 9 — V3 FP32 float4 已归档；当前进行 FP16 存储与 half2 成对访
   `(128,257)`、`(129,33)` 失败。Review 定位到 aligned 分支的
   指数和尾部循环误将 `expf(...)` 加到 `thread_max`，而实际规约
   `thread_sum`；这是漏算尾部导致的分母错误，不是 FP16 阈值过严。
+- 学习者已修正 half2 的 sum 尾部。FP16 标量与 half2 各 19 组
+  正确性全部 PASS；half2 的 Compute Sanitizer 报告 0 errors、
+  0 bytes leaked。本地构建、正确性与 memcheck 复验一致。
+- FP16 标量/half2 交替三轮 Event 中，`(128,4096)` 平均 latency
+  分别为 0.006536/0.006190 ms，half2 约快 5.30%；但 `(1,128)`
+  和 `(128,1024)` 的 half2 分别约慢 5.13% 和 5.70%，没有一致收益。
+- 一次 `(128,4096)` ncu 对照：标量/half2 global-load request
+  为 49152/24576，sector 均为 98304，Profile 时间为 8.51/8.45 µs。
+  request 减半只说明访存分组变化，不说明读取字节数或 DRAM 流量减半。
+  V3 FP16 的正确性、Benchmark、Profile、Notes 已闭环。
 
 ## 当前问题
 
-- FP16 half2 的成对读取/写回已填，但指数和尾部误更新局部 max，
-  需学习者修正并重新完成 19 组正确性与 Compute Sanitizer。
-  在此之前不使用 Benchmark/Profile 判断性能。
-- FP32 `float4` 版的性能没有一致收益，不能把这次负收益直接推广到
-  FP16 half2；两者 dtype、每组宽度和数据量均不同。
+- FP16 half2 没有稳定优于同 dtype 标量版；不再为了追求“必须更快”
+  而扩展本节优化。最终独立 Softmax 验收与 Day 10/11 的计划项目
+  尚未完成，不能宣告 Bootcamp 毕业。
 
 ## 今日关键知识
 
@@ -524,10 +532,20 @@ Day 9 — V3 FP32 float4 已归档；当前进行 FP16 存储与 half2 成对访
 - 尾部元素必须分别参与 max、指数和与写回；sum 阶段误写到
   `thread_max` 会使分母漏掉尾部。`hidden=1` 时分母变为 0；
   其他奇数列可能因尾部贡献很小而偶然通过阈值，不能因此认为正确。
+- FP32 max/exp/sum 既维持标量/half2 实验的算术口径，也避免长行
+  指数和反复 FP16 舍入；max 仅选择已量化输入中的最大值，并非
+  数学上必须用 FP32。是否改成 FP16 算术属于另一项独立实验。
+- 基址对齐时，`hidden=33` 的 FP16 行首每跨一行偏移 66 字节；
+  偶数行满足 half2 的 4 字节对齐，16 对后剩 1 个标量尾部；
+  奇数行整行走标量路径。代码实际检查输入、输出两个行首。
+- half2 把 global-load request 减半，但每请求覆盖 sector 从 2
+  增至 4，总 sector 不变；Event 的快慢依形状而异，不能把
+  request 减少直接等同于整体速度收益。
 
 ## 下一任务
 
-- 学习者修正 `v3_fp16.cu` 指数和尾部的累加目标，不调整误差阈值；
-  重新构建并提交 19 组正确性、退出码与 Compute Sanitizer 摘要。
-  全部通过后，再与标量 FP16 基线交替三轮 Benchmark、采集最小 Profile。
-  暂存变体的 Sanitizer 摘要若补发，再补记其安全复验状态。
+- 按计划转入 Day 10 Nsight Systems：对 Vector Add、Softmax 和多 kernel
+  sequence 观察 CPU launch、H2D/D2H、kernel gap 与执行顺序，
+  由学习者亲自采集时间线和解释。Day 11 再整理单 kernel Nsight
+  Compute 对照。之后按计划进行“从空文件独立实现”的最终 Softmax
+  验收；此处不提前宣告通过。

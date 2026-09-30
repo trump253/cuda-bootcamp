@@ -83,9 +83,10 @@ cuda-bootcamp/
   对照与 Notes 已完成，验收通过。
 
 Day 8 的验收记录位于 `06_fp16_half2/README.md`；Day 9 Softmax 的
-V0/V1/V2 已验收；V3 FP32 `float4` 已完成正确性、Benchmark、
-Profile 和 Notes，且已清理过时 TODO。当前进行计划中的
-FP16/half2 练习：标量 FP16 基线已通过，half2 核心仍留给学习者。
+V0/V1/V2 已验收；V3 FP32 `float4` 与 FP16 `half2` 的正确性、
+Benchmark、Profile 和 Notes 也已闭环。half2 对照未显示所有形状的
+一致加速。下一步按计划进行 Day 10 Nsight Systems；Bootcamp
+最终独立 Softmax 验收尚未完成。
 详细进度见 `PROGRESS.md`。
 已学习的问题与答案持续整理在 `CUDA_复习与面试问答.md`。
 
@@ -119,8 +120,8 @@ compute-sanitizer --tool memcheck --leak-check full --error-exitcode 99 \
 
 ## 协作方式
 
-请先自行完成当前阶段的 TODO，再提交源码、构建输出、正确性输出和 Sanitizer
-输出供 Review。任何性能优化都必须由可复现的测量结果证明。
+后续核心练习仍由学习者独立完成，再提交源码、构建输出、正确性输出和
+Sanitizer 输出供 Review。任何性能优化都必须由可复现的测量结果证明。
 
 所有 Benchmark/Profile 的人类可读输出必须在数值后显式标注单位，例如
 `0.259670 ms`、`516.88 GB/s`；后续创建的模板同样遵守此规范。

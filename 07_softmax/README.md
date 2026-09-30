@@ -1,11 +1,12 @@
 # Day 9：Softmax V0–V3
 
-本节输入、输出均为行主序 FP32 矩阵，形状 `[rows, hidden]`。每一行独立执行
+本节先以行主序 FP32 矩阵实现 Softmax，再以 FP16 输入/输出存储练习
+half2 成对访存，形状均为 `[rows, hidden]`。每一行独立执行
 Softmax。按计划依次完成 V0 逐行朴素版、V1 Shared Memory、V2 Warp Shuffle、
 V3 合理向量化；每版都要有正确性、Benchmark 与必要的 Profile 证据，不能只凭
-源码推断加速。V0/V1/V2 已验收；V3 FP32 `float4` 已完成正确性、
-测量与 Notes，性能收益并未在所有形状成立。当前按计划开始
-FP16 存储与 `half2` 成对访存练习。
+源码推断加速。V0/V1/V2 已验收；V3 FP32 `float4` 和 FP16 `half2`
+均已完成正确性、Benchmark、Profile 与 Notes，向量化均未带来所有形状上的
+一致加速。Bootcamp 最终独立 Softmax 验收尚未进行。
 
 ## 当前文件
 
@@ -13,7 +14,7 @@ FP16 存储与 `half2` 成对访存练习。
 - `v1.cu`：学习者已实现每行一个 block 的 Shared Memory max/sum 规约。
 - `v2.cu`：学习者已实现 warp 内 shuffle 与跨 warp 的两级 max/sum 规约。
 - `v3.cu`：学习者已实现 `float4` 读取、写回与尾部处理，沿用 V2 两级规约。
-- `v3_fp16.cu`：同一源码构建 FP16 标量基线与待完成的 half2 练习版。
+- `v3_fp16.cu`：同一源码构建 FP16 标量基线与已完成的 half2 练习版。
 - `softmax_fp16_harness.h`：复用输入生成和 CPU Reference，提供
   基于真实 FP16 输入的验证、CUDA Event 与单 kernel Profile。
 - `softmax_harness.h`：共用的确定性输入、CPU Reference、GPU 正确性校验、
@@ -22,7 +23,7 @@ FP16 存储与 `half2` 成对访存练习。
 - `DAY9_V1_TASK.md`：已完成的 V1 任务、验收标准和提交内容。
 - `DAY9_V2_TASK.md`：已完成的 V2 Warp Shuffle 任务与验收标准。
 - `DAY9_V3_TASK.md`：已完成的 V3 FP32 `float4` 任务与对照要求。
-- `DAY9_V3_FP16_TASK.md`：FP16/half2 的当前任务与验收要求。
+- `DAY9_V3_FP16_TASK.md`：FP16/half2 已完成任务的接口与验收要求。
 
 V1 的初版与列映射修正版均已完成正确性、Benchmark/Profile 对照。
 
@@ -300,9 +301,9 @@ ncu 时长与正常 Event 时长分开使用，不混算绝对值。
 标量、标量、标量、向量化、标量，并理解本次 request 降四倍
 但 sector 总数不变。V3 FP32 的正确性、Benchmark、最小 Profile
 与 Notes 已闭环；源码的过时 TODO 注释现已清理。
-FP16/half2 部分及 Bootcamp 最终验收均尚未完成。
+FP16/half2 的结果见下一节；Bootcamp 最终验收尚未完成。
 
-## 当前 FP16/half2 练习状态
+## V3 FP16/half2：正确性、Benchmark、Profile
 
 FP32 `v3.cu` 已清理完成项的 TODO，仅保留对齐、尾部和规约说明；
 算法未改。FP16 部分采用同一 `__half` 输入/输出格式做标量/half2
@@ -310,9 +311,49 @@ FP32 `v3.cu` 已清理完成项的 TODO，仅保留对齐、尾部和规约说�
 输入舍入为 FP16，再以实际半精度输入值计算，避免把输入量化误差
 误判成 kernel 误差。输出的半精度舍入另由绝对/相对误差与行和检查。
 
-目前两个 CMake target 均编译通过。`softmax_fp16_scalar` 的
-19 组正确性全部 PASS、退出码 0，Compute Sanitizer 为
-`0 errors`、`0 bytes leaked`、退出码 0；这是可复用的同 dtype
-性能基线，不代表 half2 已验收。`softmax_fp16_half2` 的六处 TODO
-仍由学习者实现，当前 19 组按预期 FAIL、退出码 1；不要在正确性
-通过前使用它的 Benchmark 或 Profile 数字作性能结论。
+学习者完成并修正 half2 路径的奇数列 sum 尾部后，两版各 19 组
+正确性全部 PASS、退出码均为 0；half2 的 Compute Sanitizer 为
+`0 errors`、`0 bytes leaked`、退出码 0，本地复验一致。两版输出
+误差完全一致：这里 half2 成对搬运后拆成 FP32 分量计算，没有把
+max、指数和或归一化改成 FP16 算术。
+
+同一 GPU 上整程序预热并交替运行三轮；下表是 CUDA Event 的
+kernel-only latency，warm-up 10 次、正式迭代 100 次：
+
+| 形状 | FP16 标量三轮 / 平均（ms） | half2 三轮 / 平均（ms） | 标量/half2 平均延迟比 |
+| --- | --- | --- | ---: |
+| `(1,128)` | 0.002885 / 0.002924 / 0.003021；0.002943 | 0.003012 / 0.003219 / 0.003052；0.003094 | 0.951× |
+| `(16,512)` | 0.003403 / 0.003397 / 0.003401；0.003400 | 0.003210 / 0.003275 / 0.003378；0.003288 | 1.034× |
+| `(128,1024)` | 0.003980 / 0.003976 / 0.003999；0.003985 | 0.004237 / 0.004208 / 0.004192；0.004212 | 0.946× |
+| `(128,4096)` | 0.006656 / 0.006504 / 0.006449；0.006536 | 0.006159 / 0.006154 / 0.006256；0.006190 | 1.056× |
+
+half2 在 `(16,512)`、`(128,4096)` 略快，另外两个形状略慢；最大形状的平均延迟
+降低约 5.30%，但不能概括成“half2 对 Softmax 一定更快”。短 kernel
+的微小差异尤其需谨慎解释。
+
+学习者对 `(128,4096)` 采集的一次 Nsight Compute：
+
+| 指标 | FP16 标量 | half2 |
+| --- | ---: | ---: |
+| `gpu__time_duration.sum` | 8.51 µs | 8.45 µs |
+| L1/TEX global-load request | 49152 request | 24576 request |
+| L1/TEX global-load sector | 98304 sector | 98304 sector |
+| sector/request | 2 | 4 |
+
+标量版的请求数可核对为 `128 block × 8 warp × 16 轮 × 3 遍
+= 49152`；half2 每次读两元素，循环变成 8 轮，因此为
+`128 × 8 × 8 × 3 = 24576`。同一 warp 每次分别覆盖 64 字节
+或 128 字节，即 2 或 4 个连续 32 字节 sector；请求减半而总
+sector 不变。这里的 L1/TEX sector 不是 DRAM 实际流量，且没有
+采集输出写回、指数运算和指令占比，不能将微小的延迟差异归因于
+某个单一部件。ncu 的计时只在 Profile 条件下相互对照，不与
+Event 的绝对时间混算。
+
+FP32 计算精度同时是实验控制与数值选择：同 dtype 对照更能隔离
+访存分组，FP32 指数和累加则避免较长行里反复 FP16 舍入。max
+只是从已量化输入选取最大值，不是“必须 FP32 才能比较”；改成
+全 FP16 算术是另一种需要重新做精度和性能验收的实验，本节不展开。
+对 `hidden=33` 且输入/输出分配基址满足 4 字节对齐的情况，偶数
+行的行首可走 half2，处理 16 对后以标量处理末尾 1 个 half；奇数
+行的行首不对齐，整行走标量路径。V3 FP16 的正确性、Benchmark、
+Profile 和 Notes 已闭环，但这不替代计划中的最终独立 Softmax 验收。

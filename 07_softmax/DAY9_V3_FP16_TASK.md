@@ -56,10 +56,10 @@ CUDA_VISIBLE_DEVICES=0 compute-sanitizer --tool memcheck --leak-check full \
 echo $?
 ```
 
-当前 `half2` 只是可编译模板：TODO 未填时出现 `FAIL`、退出码 1
-是预期，不是验收通过。完成后需 19 组全 `PASS`、两个退出码均为 0，
-Sanitizer 报告 `0 errors`、`0 bytes leaked`。特别说明奇数 `hidden`
-时哪些行可走 half2、哪些行必须退回标量路径。
+建模时 `half2` 只是可编译模板：TODO 未填时出现 `FAIL`、退出码 1
+是预期，不是验收通过。本任务现已由学习者完成：19 组全 `PASS`、
+退出码为 0，Sanitizer 报告 `0 errors`、`0 bytes leaked`。奇数 `hidden`
+的行首对齐与尾部处理结论见本节 README。
 
 ## Benchmark 与 Profile
 

@@ -534,13 +534,13 @@ Day 10 — 容器内 Nsight Systems GUI 与 noVNC 已启动并验证；三份正
 - 已实际打开 `build/day10_vector_add.nsys-rep`，确认 GUI 中显示
   时间线与 CUDA API/GPU 行；新增 `08_nsys/GUI.md` 记录 SSH / VS Code
   端口转发、环境变量、缺库修复及重启步骤。此项验证不替代学习者分析。
+- 学习者已确认本地浏览器通过端口转发看到 `day10_vector_add`
+  时间线；容器内 GUI 启动、报告加载和本地查看的完整路径已验证。
 
 ## 当前问题
 
 - Day 10 的三份正式报告与四个时间线问题仍待学习者完成；
   Day 11 与最终独立 Softmax 验收尚未进行。
-- 容器侧 GUI 和浏览器中转已经验证；学习者本地浏览器的 SSH
-  端口转发与交互显示仍待确认。当前入口为远程端口 `6080`。
 
 ## 今日关键知识
 
@@ -592,8 +592,8 @@ Day 10 — 容器内 Nsight Systems GUI 与 noVNC 已启动并验证；三份正
 
 ## 下一任务
 
-- 按 `08_nsys/GUI.md` 转发远程端口 `6080`，在本地浏览器连接
-  已启动的 GUI，完成 Vector Add 报告的时间线观察。
+- 在已连接的 GUI 中展开 GPU 与 CUDA API 行，完成 Vector Add
+  报告的时间线观察；需要重启或打开其他报告时参考 `08_nsys/GUI.md`。
 - 学习者按照 `08_nsys/README.md` 亲自采集 Vector Add、Softmax V2、
   Reduction V3 三份报告，填写 `08_nsys/NOTES.md`，提交关键截图
   或 CLI 片段及四个问题的答案供 Review。达到 Day 10 验收后再进入

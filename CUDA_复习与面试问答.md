@@ -550,3 +550,15 @@ stall 是某个 warp 的下一条指令暂时不能发出。比如读 input 后�
 ### theoretical occupancy 为 100%，achieved 约 44%，为什么不能说 GPU 利用率只有 44%？
 
 它描述驻留 warp 相对 SM 容量的比例，不是全卡繁忙时间比例。当前报告平均为约 14 warp/SM，而 Turing 的上限是 32 warp/SM，约为 44%。本卡 68 个 SM、256 thread/block 即 8 warp/block；理论容量允许 4 block/SM，填满这批容量需要 272 个 block，但本轮只有 128 个，`Waves Per SM=0.47`，支持工作量不足一整波的解释。起止阶段和工作分布还影响实际平均值，不能把 `128/272` 当作 achieved occupancy 的精确公式，更不能仅因 kernel 短就断言 occupancy 必然低。来源：[NVIDIA Turing 调度与 occupancy 说明](https://docs.nvidia.com/cuda/archive/11.8.0/turing-tuning-guide/index.html#occupancy)。
+
+### 等待中的 warp 计入 occupancy，是否意味着等待会让 occupancy 下降？
+
+不是。驻留（active/resident）描述 warp 已在 SM 上占据执行资源；就绪（eligible）描述下一条指令已具备发出条件；发出（issued）描述 scheduler 本次选中了它。一个 warp 可以仍然驻留，但正在等数据或 barrier 而不就绪。若 SM 驻留 16 个 warp，上限 32 个，其中 12 个等待、4 个就绪，occupancy 仍是 `16/32=50%`，不是 `4/32=12.5%`。等待本身不移除驻留 warp，减少的是就绪 warp，可能影响发出指令的机会；occupancy 较低则可能反过来使延迟更难隐藏。来源：[NVIDIA 驻留、就绪与发出状态说明](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#hardware-model)。
+
+### `68 SM × 4 block/SM = 272 block` 的各项是硬件参数还是代码参数？
+
+68 是当前 RTX 2080 Ti 的 SM 数；硬件的 warp 大小为 32 thread，Turing 的驻留上限为 32 warp/SM。256 thread/block 是本次代码设置，因此每 block 有 `256/32=8 warp`，按 warp 容量计算最多驻留 `32/8=4 block/SM`。还要与寄存器、shared 和硬件 block 数限制取最小值；本次 V2 报告中这些限制为 5/128/16 block/SM，没有比 4 更紧。全卡理论容量为 `68×4=272 block`；实际一个 block 处理一行、128 行只有 128 个 block，即 `128/272≈0.47 wave`。4 不是所有 kernel 的硬件固定上限，272 也不是 grid 必须满足的数。原始字段与证据见 [Day 11 数值来源](09_ncu/NOTES.md)，硬件限制来源：[NVIDIA Turing occupancy 说明](https://docs.nvidia.com/cuda/archive/11.8.0/turing-tuning-guide/index.html#occupancy)。
+
+### 为什么优先调查访存依赖等待，却不能认定它是唯一瓶颈？只是因为有同步吗？
+
+同步是可能的其他成本，但不能证明唯一瓶颈的主要原因是现有证据范围有限。Day 11 较大的 long scoreboard 提示等访存结果，DRAM 吞吐约 35% 未显示带宽饱和，Issue Active 约 22%–24% 提示调查延迟隐藏；合理结论是“优先调查访存结果依赖与延迟隐藏”，不是“全部时间花在 DRAM”。汇总没有定位具体 load、缓存层和阶段，barrier 与固定延迟计算依赖等也未被独立分离。stall ratio 是归一化等待统计，不是总耗时百分比，也不能通过最大值证明优化该项一定决定整体性能。来源：[NVIDIA 调度与 warp 状态说明](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#sections-and-rules)。

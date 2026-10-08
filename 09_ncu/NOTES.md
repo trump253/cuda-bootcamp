@@ -74,6 +74,21 @@
 
 后两行来自本次已有报告的 `sm__warps_active.avg.per_cycle_active` 与 `smsp__issue_active.avg.per_cycle_active`，未新增采集。Issue Active 的值折合约 24%/24%/22%，描述对应活跃周期内 scheduler 发出指令的周期比例，不是全 GPU 的繁忙时间比例。
 
+### `68 SM × 4 block/SM = 272 block` 的来源
+
+本次再次导入已有 V2 报告核对，未启动 kernel 或重新采集：
+
+| 数值 | 含义 | 来源 |
+| --- | --- | --- |
+| 68 SM | 本卡的 SM 数量 | `device__attribute_multiprocessor_count=68` |
+| 32 thread/warp | 一个 warp 的线程数 | `device__attribute_warp_size=32` |
+| 32 warp/SM | 本架构每 SM 的最大驻留 warp 数 | `device__attribute_max_warps_per_multiprocessor=32` |
+| 256 thread/block | 本次 kernel 的 block 大小 | 源码常量与 `launch__block_size=256` |
+| 4 block/SM | 按 warp 容量推导的本次驻留上限 | `32 warp/SM ÷ (256/32 warp/block)`，报告 `launch__occupancy_limit_warps=4` |
+| 128 block | 本轮实际 grid 大小 | 一个 block 处理一行，`rows=128`；`launch__grid_size=128` |
+
+V2 报告的 block 数、寄存器与 shared 容量限制分别为 16/5/128 block/SM，连同 warp 限制取最小值为 4 block/SM。硬件并非对所有 kernel 都只能驻留 4 个 block；本次 4 个取决于 block 大小与资源需求。于是全卡理论驻留容量为 `68×4=272 block`，实际只有 `128/272≈0.47 wave`。272 是填满当前配置理论容量所需的 block 数，不是 grid 必须设置的数，也不保证一到 272 就能精确测到 100% achieved occupancy。硬件上限参考 [NVIDIA Turing occupancy 说明](https://docs.nvidia.com/cuda/archive/11.8.0/turing-tuning-guide/index.html#occupancy)。
+
 数据核对结论，不替代下面的学习者解释：
 
 - ncu 排序同样为 V2、V3、V1；ncu 中 V2 相对 V1 的加速比为 1.081055×，V3 相对 V2 为 0.984615×。它们与 Event 口径分别计算，没有混用。
@@ -142,9 +157,11 @@ stall 是某个 warp 的下一条指令暂时不能发出，例如要用的数�
 
 这些比值不是 kernel 总耗时百分比，不应相加成耗时分解；高 stall 也不自动等于优化它就一定加速。先区分“GPU 在等数据”与“DRAM 带宽已经用满”，不必立即追加复杂实验。
 
-## 待学习者补充的两个理解检查
+## 两个理解检查的回答与 Review
 
-1. 某个 warp 因输入数据尚未返回而等待时，其他 warp 能否继续执行？等待中的 warp 是否仍计入 occupancy？
-2. 本轮 long scoreboard 较大，但 DRAM 吞吐约 35%、Issue Active 约 22%–24%：应优先调查哪类限制？为何还不能认定它是唯一瓶颈？同时更正“barrier 比值变化不大，所以同步没影响”的结论。
+1. 学习者：“其他 warp 可以执行来隐藏延迟；等待 warp 计入 occupancy，所以等待会使 occupancy 下降。”Review：前半正确，最后的因果关系错误。等待不会把 warp 从驻留集合中移除；若一个 SM 驻留 16 个 warp，上限 32 个，即使其中 12 个在等待、4 个就绪，占用率仍是 `16/32=50%`，不是 `4/32`。等待会减少就绪（eligible）warp，可能降低发出指令的机会，而不是直接降低 occupancy。反过来，驻留 warp 较少可能使延迟更难隐藏，但二者不能混同。
+2. 学习者：“不太清楚，是因为同步吗？”导师讲解：同步是尚不能排除的一种成本，但关键不是列出一种其他开销，而是区分证据与结论。本轮较大的 long scoreboard 提示访存结果依赖等待，约 35% 的 DRAM 吞吐没有显示带宽饱和，较低的 Issue Active 提示调查延迟隐藏；这些支持优先调查访存依赖等待，而没有定位哪个 load、哪个缓存层或哪个阶段限制整体性能。barrier、固定延迟计算依赖等仍存在，而且 stall ratio 不是总耗时占比，不能通过排名证明唯一瓶颈。
 
-Review：采集、统计与前五个回答的初步 Review 已完成；同步贡献推断与 occupancy 用语已指出需修正。等待学习者完成上述两个理解检查并形成自己的瓶颈解释，Day 11 暂不标记验收通过。最终独立 Softmax 验收仍未进行。
+下一步：学习者修正第 1 条，并用自己的话复述第 2 条的证据链；无需新增采集或修改 kernel。可用“16 个驻留 warp、12 个等待、4 个就绪”检查是否区分了 occupancy 与就绪程度。
+
+Review：理解检查已收到初步回答并完成讲解；等待学习者修正 occupancy 因果关系、形成自己的有限瓶颈解释。Day 11 暂不标记验收通过，最终独立 Softmax 验收仍未进行。

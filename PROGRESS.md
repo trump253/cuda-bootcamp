@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 11 — 采集、统计与前五个回答的初步 Review 已完成；已讲解 warp stall，等待学习者修正同步/occupancy 表述并完成两个理解检查，最终独立 Softmax 验收尚未进行
+Day 11 — 两个理解检查已收到初步回答并完成讲解；等待学习者修正等待与 occupancy 的因果关系、复述有限瓶颈判断，最终独立 Softmax 验收尚未进行
 
 ## 已完成
 
@@ -600,12 +600,15 @@ Day 11 — 采集、统计与前五个回答的初步 Review 已完成；已讲�
 - 学习者已提交前五个问题的初步回答，并询问 warp stall 的含义与分析指标。向量化收益依条件、request/sector 的关系、不能仅凭 DRAM 判定瓶颈等方向正确；已纠正“barrier 比值变化不大证明同步影响小”和将 occupancy 称为全卡实际利用率的表述。
 - 已从原有报告读取平均驻留 warp 14.00/13.90/14.21 warp/SM、Issue Active 0.24/0.24/0.22，未重新采集。结合 68 SM、32 warp/SM、8 warp/block 与 grid=128，记录不足一整波工作量的证据，不把容量估算当作 achieved occupancy 的精确公式。
 - 已在 Day 11 Notes 与复习问答补充 stall 的含义、五类等待原因、延迟隐藏、访存带宽限制与访存依赖等待的区别；核心分析仍留作学习者复述与判断，没有改 kernel 或替学习者提交最终分析。
+- 学习者已正确说明其他 warp 可以执行来隐藏等待，但仍将等待计入 occupancy 推导成 occupancy 下降；已用 16 个驻留、12 个等待、4 个就绪的例子纠正，并区分驻留、就绪与发出状态。
+- 已只读导入原有 V2 报告，确认 SM 数 68、warp 大小 32 thread、每 SM 上限 32 warp、block 大小 256 thread，以及各资源的驻留限制；补充 `256/32=8 warp/block`、`32/8=4 block/SM`、`68×4=272 block` 与实际 `128/272≈0.47 wave` 的数值来源，未新采集或改 kernel。
+- 已进一步讲解：同步只是不能排除的成本之一；long scoreboard、DRAM 与 Issue Active 支持优先调查访存依赖等待，但没有定位具体 load、缓存层或阶段，不能证明唯一瓶颈。
 
 ## 当前问题
 
 - Day 10 未将亚微秒 gap 的内部成因与 GPU 纯计算占比独立分解；
   不影响本节定位时间线与区分证据/推断的验收。
-- Day 11 前五个回答已初步 Review，但第 2 条同步贡献推断与第 5 条 occupancy 用语需修正；warp stall 的独立解释与最终瓶颈判断待学习者完成，暂不验收。采集时同卡其他任务及各次程序退出码未在日志中单列，最终独立 Softmax 验收仍未进行。
+- Day 11 两个理解检查已初步 Review；等待本身不直接降低 occupancy 的因果关系、有限瓶颈判断仍待学习者复述，同步贡献仍不能独立分离，暂不验收。采集时同卡其他任务及各次程序退出码未在日志中单列，最终独立 Softmax 验收仍未进行。
 
 ## 今日关键知识
 
@@ -615,6 +618,7 @@ Day 11 — 采集、统计与前五个回答的初步 Review 已完成；已讲�
 - stall 的 `per_issue_active.ratio` 是按发出指令归一化的比值，不能与此前 Reduction 的 `per_warp_active.pct` 混用；比值升降不能直接证明绝对等待周期或同步耗时同比变化。
 - 性能百分比不是评分：本轮更快的 V2，SM Throughput 与 achieved occupancy 都比 V1 略低；V3 request 更少、occupancy 略高，却未在主要形状继续加速。
 - warp stall 表示下一条指令暂时不能发出；其他就绪 warp 可以继续执行，这就是延迟隐藏。等待中的驻留 warp 仍计入 occupancy，它不是“正在计算”的 warp 比例。
+- 等待不会自动移除驻留 warp；等待可能减少就绪 warp 和发出指令机会，而非直接降低 occupancy。当前 4 block/SM 由每 block 8 warp 与 Turing 的 32 warp/SM 推导，并需检查其他资源限制，不是所有 kernel 固定的 block 上限。
 - 长 scoreboard 等 L1/TEX 路径的结果依赖，不等于 DRAM 带宽饱和；本轮配合 Issue Active、DRAM 吞吐、request/sector、驻留 warp 与源码调查，不把最大 stall 直接当作唯一瓶颈。
 - 本轮源码中的 block barrier 阶段从 V1 的 18 个降到 V2 的 4 个，但 shared 与同步同时变化，现有实验没有独立分离各自的加速贡献；归一化 barrier ratio 不能代替总同步耗时。
 - `float4` 每组覆盖四个相邻 FP32 元素；必须检查行首实际地址的
@@ -677,5 +681,5 @@ Day 11 — 采集、统计与前五个回答的初步 Review 已完成；已讲�
 
 ## 下一任务
 
-- 学习者完成 `09_ncu/NOTES.md` 末尾两个理解检查：等待 warp 与其他 warp 的调度/occupancy 关系，以及 long scoreboard、DRAM 与 Issue Active 支持的有限判断；同时修正对 barrier 的推断。
-- 用自己的话完成瓶颈解释，再进行 Day 11 最终 Review；目前不必改 kernel 或扩展采集，验收通过后才评估下一任务。
+- 学习者修正“等待导致 occupancy 下降”的结论，并用自己的话串联 long scoreboard、DRAM 吞吐与 Issue Active，说明合理调查方向及证据尚不能证明什么。
+- 用自己的话完成 Day 11 瓶颈解释后再最终 Review；目前不必改 kernel 或扩展采集，验收通过后才评估下一任务。

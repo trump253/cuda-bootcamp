@@ -514,11 +514,18 @@ Day 10 — Nsight Systems 时间线练习框架已就绪；学习者尚未采集
 - 本机检测到 Nsight Systems 2022.4.2.50；冒烟采集成功生成
   `.nsys-rep`，`cudaapitrace`、`gputrace`、`kernexectrace` 报表
   命令均可运行。冒烟检查只验证工具链，不替代学习者的正式采集与分析。
+- 2026-10-08：已核对 NVIDIA 官方 Nsight Streamer 文档；它可在
+  服务器容器内运行 Nsight Systems GUI，通过浏览器查看已有 `.nsys-rep`。
+  当前终端检测到 Ubuntu 20.04、x86_64、RTX 2080 Ti，PATH 中未找到
+  Docker/Podman；尚未安装或启动 Streamer，也未验证浏览器连接。
 
 ## 当前问题
 
 - Day 10 的三份正式报告与四个时间线问题仍待学习者完成；
   Day 11 与最终独立 Softmax 验收尚未进行。
+- 服务器上无法直接查看图形报告。若选择 Nsight Streamer，需先确认
+  Docker 可用及容器运行权限，并验证 HTTP 与 WebRTC/TURN 两个端口
+  的连通性；当前环境的实际部署可行性尚未完成验证。
 
 ## 今日关键知识
 
@@ -555,9 +562,15 @@ Day 10 — Nsight Systems 时间线练习框架已就绪；学习者尚未采集
 - Reduction V3 的多轮规约在同一 stream 中顺序执行；Day 10 要
   通过实际时间线确认三轮顺序与 gap，并把“观察到 gap”和
   “解释 gap 的具体原因”区分开。
+- Nsight Streamer 将服务器上的 GUI 画面传到浏览器，报告通过目录
+  挂载留在服务器上。当前官方镜像支持 VP9 软件编码；RTX 2080 Ti
+  可选择此模式，AV1 GPU 编码加速才要求 Ada 或更新架构。
+  查看报告的 GUI 版本应与采集端相同或更新。
 
 ## 下一任务
 
+- 先解决报告查看方式：有 Docker 运行条件时可尝试 Nsight Streamer；
+  也可下载报告到本地 Nsight Systems GUI，暂时用现有 CLI 报表查看事件。
 - 学习者按照 `08_nsys/README.md` 亲自采集 Vector Add、Softmax V2、
   Reduction V3 三份报告，填写 `08_nsys/NOTES.md`，提交关键截图
   或 CLI 片段及四个问题的答案供 Review。达到 Day 10 验收后再进入

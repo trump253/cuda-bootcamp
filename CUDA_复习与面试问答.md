@@ -826,3 +826,25 @@ global-load request 为 `49152/24576`，sector 均为 `98304`；
 kernel 加速。两版仍有 FP32 `expf`、两级规约、同步和数据转换；
 当前指标不能分离它们的具体耗时贡献，更不能把 L1/TEX sector
 直接当作 DRAM 流量。
+
+## 10. Nsight Systems 时间线
+
+### 服务器没有桌面，能用 Nsight Streamer 查看 `.nsys-rep` 吗？
+
+可以。它在服务器的容器中运行 Nsight Systems GUI，通过 WebRTC
+把界面传到浏览器；将已有报告目录挂载进容器后，即可在 GUI 中打开
+报告，不需要把大文件下载到本地。单机可直接使用官方 Docker 镜像。
+
+需要 Docker 及容器运行权限，还要让浏览器连通 HTTP 和 WebRTC/TURN
+端口；当前官方单机默认端口为 TCP 8080、3478。使用 SSH 隧道时，
+两个端口都要转发，实际连接仍需验证。GUI 应与生成报告的 CLI
+版本相同或更新；采集程序无需在 Streamer 容器中运行。
+
+当前官方镜像支持 `ENCODER=vp9` 软件编码；AV1 GPU 编码加速要求
+Ada 或更新架构。因此本机 RTX 2080 Ti 可以选择软件模式。当前终端
+PATH 中未找到 Docker/Podman，不能把文档支持视为部署已经成功。
+报告较小时也可下载到本地 GUI 查看；纯终端先用
+`nsys stats` 的事件报表辅助分析，但报表本身不提供交互式时间线。
+
+来源：[NVIDIA NGC Nsight Streamer](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/devtools/containers/nsight-streamer-nsys)、
+[Nsight Systems User Guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html)。

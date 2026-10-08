@@ -86,8 +86,11 @@ cuda-bootcamp/
   对照与 Notes 已完成，验收通过。
 - Day 9 Softmax V0–V3：FP32 `float4` 与 FP16 `half2` 均完成闭环；
   向量化未获得所有形状上一致的性能收益。
+- Day 10 Nsight Systems：三份时间线、传输与同步定位、依赖顺序和
+  短 kernel 提交开销分析已完成 Review，验收通过。
 
-当前进行 [Day 10 Nsight Systems 时间线练习](08_nsys/README.md)。
+已完成 [Day 10 Nsight Systems 时间线练习](08_nsys/README.md)，
+下一阶段为 Day 11 Nsight Compute。
 Bootcamp 最终独立 Softmax 验收尚未完成。
 详细进度见 `PROGRESS.md`。
 已学习的问题与答案持续整理在 `CUDA_复习与面试问答.md`。

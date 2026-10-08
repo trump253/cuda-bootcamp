@@ -1,8 +1,9 @@
 # Day 10 时间线观察记录
 
 2026-10-08：学习者已提交三份报告的 GUI 截图和 Vector Add、Softmax
-初步解释。以下数值由仓库中的原始报告复核；Reduction 的完整解释
-与短 kernel 开销判断仍由学习者继续完成。
+初步解释，随后补交 Reduction GPU 事件截图与依赖/开销分析。
+以下数值由仓库中的原始报告复核；gap 与开销口径已在 Review 中
+更正，Day 10 时间线练习验收完成。
 
 ## 环境与报告
 
@@ -54,29 +55,55 @@
 
 ## Reduction V3：多 kernel 序列
 
-- 程序输出的 `passes` 和最终结果：待填写。
-- 三轮 kernel 的 GPU 执行顺序与各轮 grid：待填写。
-- 相邻 kernel 间是否有 gap：待填写，标注单位。
-- 从时间线可以确认的事实与仍属推断的原因：待填写。
+- 报告确认三轮，grid 为 `4097 → 17 → 1`，block 均为 256 线程。
+  本次截图未附程序最终 PASS 输出；kernel 数值正确性沿用先前已完成的
+  V3 验收，Day 10 核对时间线概念。
+- 三次 launch 均在 Stream 7。后轮读取前轮的 partial sum，数据依赖
+  要求顺序；代码使用同一 stream，提供该顺序保证。CPU 可连续提交，
+  无须在每两轮之间调用 `cudaDeviceSynchronize`。
 
-学习者已经提交截图；下一步请选中 GPU 行的三个 kernel，读取
-各自的开始时间和持续时间，再计算
-`gap = 下一轮 GPU 开始 − 本轮 GPU 结束`。CUDA API 行上同名
-事件的 Duration 是主机 launch 调用持续时间，不能代替 GPU Duration。
+| 轮次 | grid.x | CPU launch 持续（µs） | GPU Start（µs） | GPU Duration（µs） | GPU End（µs） |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1，CorrID 111 | 4097 | 115.090 | 811537.041 | 17.920 | 811554.961 |
+| 2，CorrID 113 | 17 | 8.824 | 811555.698 | 2.879 | 811558.577 |
+| 3，CorrID 115 | 1 | 6.211 | 811559.345 | 2.816 | 811562.161 |
+
+按 `gap = 下一轮 GPU Start − 本轮 GPU End`，两处 gap 分别为
+`811555.698 − 811554.961 = 0.737 µs`、
+`811559.345 − 811558.577 = 0.768 µs`。学习者初步读出的
+4/3 µs 已更正；GUI 中以秒显示的 Start 被舍入，不宜用这种
+显示精度直接计算亚微秒间隔。gap 存在的事实已确认，当前记录
+没有将其具体成因独立分解。
+
+后两轮的 CPU launch 持续时间分别约为 GPU Duration 的
+3.065/2.206 倍，主机提交成本相对显著。但 GPU 的约 2.8 µs
+是设备执行区间，不能说其中“基本都是 CPU 提交”。17 个 block
+可以分布在多个 SM 并行执行，每 block 的规约流程与 1 个 block
+版本相近；因此总 kernel 持续时间不必随 block 数线性增长。
+小规模设备执行还包含访存、规约、同步、调度与采集影响，当前
+数据不能单独求出“纯计算”占比。
+
+CPU 在第一轮 GPU 执行时提交后两轮，第三轮提交还与第二轮 GPU
+执行部分重叠。CPU launch Duration 不能与 GPU Duration 直接
+相加来代表整个序列耗时；第一次 115.090 µs 的 launch 也不代表
+稳态提交成本。
 
 ## 四个验收问题的结论
 
 1. kernel launch 是否有 gap：Softmax 的 start-to-start latency 已确认；
-   Reduction 的相邻 GPU kernel gap 与解释待学习者补全。
+   Reduction 相邻 GPU kernel 的 gap 为 0.737/0.768 µs。
 2. H2D/D2H 在哪里：Vector Add 已定位并复核，见上表。
-3. 短 kernel 的主机提交/等待开销是否显著：待填写，附数值与单位。
-4. 多 kernel pipeline 的执行顺序：待填写。
+3. 短 kernel 的主机提交/等待开销是否显著：后两轮 launch 为
+   8.824/6.211 µs，GPU 执行为 2.879/2.816 µs，提交成本相对显著；
+   主机与设备有重叠，不能据此将整个序列归为提交时间。
+4. 多 kernel pipeline 的执行顺序：同一 stream 保证前轮完成后
+   后轮执行，满足 partial sum 的依赖；数据依赖本身不自动建立跨 stream 顺序。
 
 ## 本次仍不确定的问题
 
-- Reduction 三轮 GPU 开始/持续时间及 gap，最后两轮主机调用与
-  GPU 执行时间的比较，待学习者填写。
+- 亚微秒 gap 的内部原因及设备执行区间中纯计算的占比，当前证据未分解。
 - 运行配置、程序退出码和 Reduction 最终 PASS 输出尚未在本次提交中给出。
 
 字段含义参考 [NVIDIA Nsight Systems latency 与 overhead 说明](https://developer.nvidia.com/blog/understanding-the-visualization-of-overhead-and-latency-in-nsight-systems/)；
 pageable H2D 的返回语义参考 [CUDA 11.8 API 同步行为](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-runtime-api/api-sync-behavior.html)。
+stream 顺序与 block 调度参考 [CUDA 11.8 编程指南](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-c-programming-guide/index.html#streams)。

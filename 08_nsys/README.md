@@ -1,5 +1,8 @@
 # Day 10：Nsight Systems 时间线练习
 
+本节已完成采集与 Review，验收通过；原始时间戳、口径更正和
+结论见 [NOTES.md](NOTES.md)。以下命令保留供复现与复习。
+
 本节只按学习计划练习系统级时间线：CPU 发起 CUDA 调用、H2D/D2H、
 GPU kernel 与相邻 kernel 之间的空隙。复用已验收的 kernel，今天
 **不需要写新 kernel，也不以优化吞吐量为目标**。

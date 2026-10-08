@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 10 — 学习者已提交三份时间线截图；Vector Add 与 Softmax 数值已复核，Reduction gap 与短 kernel 开销解释待补全，最终独立 Softmax 验收尚未进行
+Day 10 — 三份时间线、依赖顺序与短 kernel 开销解释已完成 Review，验收通过；下一步 Day 11 Nsight Compute，最终独立 Softmax 验收尚未进行
 
 ## 已完成
 
@@ -580,12 +580,20 @@ Day 10 — 学习者已提交三份时间线截图；Vector Add 与 Softmax 数�
   start-to-start latency 为 164.139 µs。GPU 开始早于 API 返回
   1.901 µs，说明主机调用与设备执行可部分重叠。初步回答的
   64.139 µs 已更正，数据与口径整理在 `08_nsys/NOTES.md`。
+- 学习者已补交三轮 Reduction 的 GPU Duration 与 grid 截图，
+  正确解释后轮依赖前轮 partial sum，以及后两轮提交时间相对显著。
+  原始报告复核三轮 GPU Duration 为 17.920/2.879/2.816 µs，
+  gap 为 0.737/0.768 µs；初步读出的 4/3 µs 已更正。
+- 已补充具体顺序保证来自同一 stream，而非 GPU 自动识别数据依赖；
+  17 个 block 可以并行，持续时间不随 block 数线性增长。CPU
+  launch 与 GPU 执行可重叠，GPU Duration 也不包含 CPU 提交时间。
+  Day 10 的四个时间线问题与 Notes 已完成 Review，验收通过。
 
 ## 当前问题
 
-- 三份 Day 10 报告已生成并提交截图；Reduction 的 GPU 三轮
-  Start/Duration、相邻 gap 和短 kernel 开销比较仍待学习者解释。
-  本次提交尚未包含程序退出码与 Reduction 最终结果；Day 10 尚未验收。
+- Day 10 未将亚微秒 gap 的内部成因与 GPU 纯计算占比独立分解；
+  不影响本节定位时间线与区分证据/推断的验收。Day 11 与最终
+  独立 Softmax 验收尚未进行。
 
 ## 今日关键知识
 
@@ -641,11 +649,14 @@ Day 10 — 学习者已提交三份时间线截图；Vector Add 与 Softmax 数�
   是三个不同指标；调用区间与 GPU 区间可重叠，不能相加成总时间。
 - Pageable H2D 的 `cudaMemcpy` 可能在设备搬运完成前返回；
   `cudaDeviceSynchronize` 等待先前提交的设备工作，不仅是最后一个 kernel。
+- 亚微秒 gap 应使用原始时间戳计算，不能用 GUI 已舍入的秒数估算。
+  本次两个 gap 只有 0.737/0.768 µs，不能与 start-to-start latency 混淆。
+- 小 grid 的 block 可以并行执行，17 个 block 不要求比 1 个 block
+  慢 17 倍；主机提交成本大于 GPU Duration 说明提交开销相对显著，
+  不代表 GPU 执行区间里“都是 CPU 提交开销”。
 
 ## 下一任务
 
-- 学习者继续在已有 Reduction 报告中读取 GPU 三轮 Start/Duration，
-  用 `下一轮 GPU Start − 本轮 GPU End` 计算 gap，解释同 stream
-  的执行顺序；比较最后两轮的 CPU launch 与 GPU Duration，
-  判断短 kernel 主机提交开销是否显著，并补交退出码/最终结果。
-  概念复核后完成 Day 10 验收，再进入 Day 11。
+- 按计划准备 Day 11：对 Softmax V1/V2/V3 在同一形状下比较
+  Kernel Duration、Memory/DRAM/Compute Throughput、Occupancy
+  与 Warp Stall，形成分析笔记。核心采集与解释由学习者完成。

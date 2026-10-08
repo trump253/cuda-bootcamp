@@ -532,3 +532,27 @@ kernel。同步 API 持续 101.907 µs，kernel 自身持续 20.255 µs；
 同步耗时不能直接代表最后一个 kernel 的耗时。D2H 到主机的
 `cudaMemcpy` 则在复制完成后才返回。
 来源：[CUDA 11.8 API 同步行为](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-runtime-api/api-sync-behavior.html)。
+
+### 相邻 kernel 的 gap 如何精确计算？顺序由什么保证？
+
+使用 `gap = 下一轮 GPU Start − (本轮 GPU Start + GPU Duration)`。
+本次 Reduction 三轮的 GPU Start 为
+811537.041/811555.698/811559.345 µs，Duration 为
+17.920/2.879/2.816 µs；两处 gap 为 0.737/0.768 µs。
+GUI 将 Start 以秒显示时会舍入，不能用这种精度算亚微秒 gap。
+后轮需要前轮的 partial sum，这是算法对顺序的要求；本次代码
+在同一 stream 连续提交，stream 语义保证实际顺序，CPU 无须
+每轮之间同步。数据依赖本身不会自动替不同 stream 建立顺序。
+来源：[CUDA 11.8 stream 顺序说明](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-c-programming-guide/index.html#streams)。
+
+### 17 个 block 和 1 个 block 都只运行约 2.8 µs，说明什么？
+
+block 可以分布到多个 SM 并行，kernel Duration 不要求随 block
+数量线性增长；这两个小 grid 的每 block 规约流程也相近。
+本次后两轮 CPU launch 为 8.824/6.211 µs，GPU Duration 为
+2.879/2.816 µs，支持“主机提交成本相对显著”。GPU Duration
+记录设备执行，不能说里面基本都是 CPU 提交；其中仍包含访存、
+规约、同步与采集影响，当前数据不足以分离纯算术占比。主机提交
+还会与前一轮 GPU 工作重叠，不能将 CPU/GPU 各段相加或仅凭
+这些比值断言整个流程只受 launch 限制。
+来源：[CUDA 11.8 block 调度说明](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-c-programming-guide/index.html#hardware-implementation)。

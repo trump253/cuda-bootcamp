@@ -498,3 +498,7 @@ Xvfb 只提供容器内的虚拟屏幕，想在本地看到它还需 VNC/noVNC �
 ### `build/nsys-gui/` 被 Git 忽略，是否可以随时删除并只重新运行 `nsys-ui`？
 
 这个目录可以重建，但运行 noVNC 时需要其中的网页、脚本、翻译和配置。Git 忽略生成文件，不代表运行时不依赖它们。`mkdir -p` 只创建空目录，`nsys-ui` 只启动 GUI；整目录清理后还需用 `08_nsys/configure_novnc.py` 重建网页资源并恢复连接服务。当前 websockify 将 `web/` 作为工作目录，在运行中删除它后，即使重建同名路径也需要重启 websockify。清理与恢复顺序见 [容器内 GUI 指南](08_nsys/GUI.md)。
+
+### 查看已有 `.nsys-rep`，需要先创建一个 Project 吗？
+
+不需要。报告可以通过 `File → Open` 独立打开；`.qdproj` 保存项目配置，与 `.nsys-rep` 报告是不同的文件。误建空项目时，本机 Nsight Systems 2022.4.2 可先右键选择 `Unload`，再次右键选择 `Remove Project` 将其移出列表；磁盘目录仍会保留，需要另行清理。来源：[NVIDIA 已有报告的打开与共享说明](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#opening-an-existing-report)。

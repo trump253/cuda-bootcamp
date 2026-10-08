@@ -75,21 +75,11 @@ def main():
     elif link.exists():
         raise SystemExit(f"网页资源入口已被其他文件占用：{link}")
     link.symlink_to(Path("..") / target.name, target_is_directory=True)
-    query = "?autoconnect=true&resize=scale&quality=5&compression=2"
-    entry = f'''<!DOCTYPE html>
-<html lang="zh-CN">
-<head><meta charset="utf-8"><title>Nsight Systems 远程桌面</title></head>
-<body>
-<p>正在打开简体中文桌面……</p>
-<p><a href="./{target.name}/vnc.html{query.replace('&', '&amp;')}">打开桌面</a></p>
-<script>
-const target = new URL("./{target.name}/vnc.html", window.location.href);
-target.search = window.location.search || "{query}";
-target.hash = window.location.hash;
-window.location.replace(target);
-</script>
-</body></html>
-'''
+    # 根地址直接显示桌面，页面内的相对资源仍从版本目录加载。
+    page = (target / "vnc.html").read_text()
+    if page.count("<head>") != 1:
+        raise SystemExit("noVNC 网页结构与预期不符，请检查固定版本。")
+    entry = page.replace("<head>", f'<head>\n    <base href="./{target.name}/">', 1)
     for name in ["index.html", "vnc.html"]:
         (web / name).write_text(entry)
     print(f"noVNC {VERSION} 简体中文资源已准备：{target}")

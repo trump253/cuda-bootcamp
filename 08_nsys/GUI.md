@@ -4,11 +4,13 @@
 
 ## 在本地看到界面
 
-使用 VS Code Remote SSH 时，打开“端口 / Ports”面板，选择“转发端口”，输入远程端口 `6080`。在本地浏览器打开转发后的地址，并访问 `/noVNC-1.7.0/vnc.html`。如果 VS Code 分配的本地端口也是 `6080`，使用下面的入口，页面会自动连接：
+使用 VS Code Remote SSH 时，打开“端口 / Ports”面板，选择“转发端口”，输入远程端口 `6080`。在本地浏览器打开转发后的根地址。如果 VS Code 分配的本地端口也是 `6080`，使用下面的入口，页面会直接显示 noVNC 桌面并自动连接：
 
-<http://127.0.0.1:6080/noVNC-1.7.0/vnc.html?autoconnect=true&resize=scale&quality=5&compression=2>
+<http://127.0.0.1:6080/>
 
-如果本地端口不同，替换地址中的 `6080`。版本路径让整套网页和 JavaScript 资源使用新地址，避免新网页混用旧版模块；旧 `/vnc.html` 入口会跳转到新路径。参数也会覆盖浏览器此前保存的画质设置。
+如果本地端口不同，替换地址中的 `6080`。首页和 `/vnc.html` 都直接显示桌面；页面内部仍从 `/noVNC-1.7.0/` 加载资源，避免混用旧版模块。此前的强制跳转已移除，旧浏览器缓存可用 `Ctrl+F5` 强制刷新。
+
+需要显式覆盖浏览器保存的连接与画质设置时，可使用：<http://127.0.0.1:6080/?autoconnect=true&resize=scale&quality=5&compression=2>。原来的版本路径入口也可继续使用。
 
 使用普通 SSH 时，在**本地电脑的终端**运行下面的命令，把 `your-container` 换成平时连接这个容器的 SSH 别名或目标；需要特殊 SSH 端口或跳板机时沿用原来的参数。
 
@@ -33,6 +35,12 @@ nsys-ui build/day10_vector_add.nsys-rep
 这些变量只作用于当前终端。`DISPLAY` 指向虚拟屏幕；Mesa 的 llvmpipe 在 CPU 上渲染界面，本次实测 OpenGL 3.1；`QTWEBENGINE_CHROMIUM_FLAGS` 处理 root 运行 Qt WebEngine 的启动要求。
 
 打开报告后，展开 GPU 下的 CUDA HW 行查看 kernel 与内存传输，再查看进程/线程下的 CUDA API 行。先缩放到第二组较大的 Vector Add 用例，按 [README.md](README.md) 的四个问题记录 CPU 调用、GPU 执行和同步。启动 GUI 的环境验证不替代 Day 10 的时间线分析验收。
+
+## 移除误建的项目
+
+本机 Nsight Systems 2022.4.2 的操作顺序是：在 Project Explorer 中右键误建的项目，先选择 `Unload`；再次右键该项目，选择 `Remove Project`。卸载后才会出现移除选项。本次已按此顺序移除 `Project 1`，当前列表只保留从文件打开的 Vector Add 报告。
+
+`Remove Project` 会将项目移出列表，磁盘目录仍会保留。本次误建的 `/root/.nsightsystems/Projects/Project 1/` 仅包含 112 字节的空项目配置，已移入用户回收站。查看已有 `.nsys-rep` 时，用 `File → Open` 直接打开即可，无需创建采集项目。
 
 ## 关闭窗口后重新打开
 

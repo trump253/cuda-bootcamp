@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 10 — 三份时间线、依赖顺序与短 kernel 开销解释已完成 Review，验收通过；下一步 Day 11 Nsight Compute，最终独立 Softmax 验收尚未进行
+Day 11 — Nsight Compute 对照任务与分析模板已准备，等待学习者采集 Softmax V1/V2/V3 并解释结果；Day 10 已验收，最终独立 Softmax 验收尚未进行
 
 ## 已完成
 
@@ -588,15 +588,23 @@ Day 10 — 三份时间线、依赖顺序与短 kernel 开销解释已完成 Rev
   17 个 block 可以并行，持续时间不随 block 数线性增长。CPU
   launch 与 GPU 执行可重叠，GPU Duration 也不包含 CPU 提交时间。
   Day 10 的四个时间线问题与 Notes 已完成 Review，验收通过。
+- 2026-10-08：已去除复习问答末尾五个 Day 10 新增答案与 `08_nsys/NOTES.md` 中的人工折行，保留标题、段落与表格分隔，数值和结论不变。
+- 已创建 `09_ncu/README.md` 与 `09_ncu/NOTES.md`，提供同配置三轮 Event、四个 Nsight Compute section、既有 shared/request/sector 计数器和六个分析问题；未代替学习者采集或填写结论。
+- CMake 默认构建切换为 Softmax V1/V2/V3，Day 10 的 Vector Add 与 Reduction V3 已恢复为可重新启用的注释目标；未修改已完成的 kernel。
+- 已确认本机 ncu 2022.3.0 可识别四个 section 与采集参数，构建配置保留现有 Debug / sm_75。
+- 三个 target 已编译成功；每版 19 组正确性测试均 PASS，共 57 组，退出码为 0。任务文档中的 Bash 命令通过语法检查；两份旧笔记去除空白后与原文完全一致，确认仅改排版。新的 Benchmark/Profile 尚未代跑。
 
 ## 当前问题
 
 - Day 10 未将亚微秒 gap 的内部成因与 GPU 纯计算占比独立分解；
-  不影响本节定位时间线与区分证据/推断的验收。Day 11 与最终
-  独立 Softmax 验收尚未进行。
+  不影响本节定位时间线与区分证据/推断的验收。
+- Day 11 框架已准备，但新的同轮 Benchmark/Profile、瓶颈判断与最终独立 Softmax 验收尚未完成；不得把准备框架记成实验通过。
 
 ## 今日关键知识
 
+- Day 11 从单 kernel 内部分析 Duration、Memory/DRAM/Compute Throughput、Occupancy 与 Warp Stall；不再把 CPU launch 时长混入 GPU Duration。
+- 同名 Memory Throughput 需区分 section 与单位；SM 吞吐百分比不等于 FLOP/s，occupancy 也不是全卡 SM 利用率或性能得分。
+- 本机 WarpStateStats 的 stall 图使用 cycles/instruction，不是 kernel 耗时百分比；ncu replay 的时钟与缓存条件不同于暖机后的 Event，二者不可混用计算加速比。
 - `float4` 每组覆盖四个相邻 FP32 元素；必须检查行首实际地址的
   16 字节对齐，尾部不足四个元素不能直接用完整 `float4` 读取。
 - 某行是否对齐还取决于 `row`：基址对齐时条件为
@@ -657,6 +665,5 @@ Day 10 — 三份时间线、依赖顺序与短 kernel 开销解释已完成 Rev
 
 ## 下一任务
 
-- 按计划准备 Day 11：对 Softmax V1/V2/V3 在同一形状下比较
-  Kernel Duration、Memory/DRAM/Compute Throughput、Occupancy
-  与 Warp Stall，形成分析笔记。核心采集与解释由学习者完成。
+- 学习者按 `09_ncu/README.md` 复查三版正确性，测三轮 Event，并采集相同 `(128,4096)`、grid=128、block=256 的三份 ncu 报告。
+- 填写 `09_ncu/NOTES.md`，回答六个问题，提交原始输出与解释供 Review；暂不改 kernel 或添加其他课程任务。

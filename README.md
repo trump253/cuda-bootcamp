@@ -69,7 +69,11 @@ cuda-bootcamp/
 │   ├── DAY9_V2_TASK.md
 │   ├── DAY9_V3_TASK.md
 │   └── DAY9_V3_FP16_TASK.md
-└── 08_nsys/
+├── 08_nsys/
+│   ├── README.md
+│   ├── GUI.md
+│   └── NOTES.md
+└── 09_ncu/
     ├── README.md
     └── NOTES.md
 ```
@@ -88,10 +92,9 @@ cuda-bootcamp/
   向量化未获得所有形状上一致的性能收益。
 - Day 10 Nsight Systems：三份时间线、传输与同步定位、依赖顺序和
   短 kernel 提交开销分析已完成 Review，验收通过。
+- Day 11 Nsight Compute：任务、三版对照命令与分析模板已准备；实验采集和结论待学习者完成。
 
-已完成 [Day 10 Nsight Systems 时间线练习](08_nsys/README.md)，
-下一阶段为 Day 11 Nsight Compute。
-Bootcamp 最终独立 Softmax 验收尚未完成。
+当前任务是 [Day 11 Nsight Compute 单 kernel 分析](09_ncu/README.md)，填写 [分析笔记](09_ncu/NOTES.md)。Day 10 已验收，Bootcamp 最终独立 Softmax 验收尚未完成。
 详细进度见 `PROGRESS.md`。
 已学习的问题与答案持续整理在 `CUDA_复习与面试问答.md`。
 
@@ -99,19 +102,17 @@ Bootcamp 最终独立 Softmax 验收尚未完成。
 
 ```bash
 cmake -S . -B build
-cmake --build build --target vector_add softmax_v2 reduction_v3 -j 8
-./build/reduction_v3 --timeline
+cmake --build build --target softmax_v1 softmax_v2 softmax_v3 -j 8
+CUDA_VISIBLE_DEVICES=0 ./build/softmax_v1 --correctness-only
 ```
 
-通常会注释已完成练习的 CMake target；当前仅启用 Day 10 所需的
-Vector Add、Softmax V2 与 Reduction V3。
+通常会注释已完成练习的 CMake target；当前仅启用 Day 11 所需的 Softmax V1/V2/V3。
 需要重新构建历史练习时，取消 `CMakeLists.txt` 中对应注释。
 项目级 CUDA 编译架构默认是 `sm_75`（RTX 2080 Ti）：所有通过本项目 CMake
 构建的 CUDA target 都会使用它，包括重新启用的历史 target。它不影响在项目外
 直接调用 `nvcc` 的命令；换 GPU 时可覆盖 CMake 变量 `CUDA_BOOTCAMP_ARCH`。
 
-三个采集命令、CLI 报表与记录模板见 `08_nsys/README.md` 和
-`08_nsys/NOTES.md`；Day 10 主要任务是学习者亲自分析时间线。
+Day 11 的正确性复查、三轮 Event 对照、ncu 报告采集与分析模板见 `09_ncu/README.md` 和 `09_ncu/NOTES.md`；本节不新增 kernel，采集与分析由学习者完成。Day 10 历史时间线与记录保留在 `08_nsys/`。
 
 ## 协作方式
 

@@ -16,9 +16,9 @@ set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 set(CUDA_BOOTCAMP_ARCH "sm_75" CACHE STRING "本工程的 CUDA 编译目标架构")
 add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:-arch=${CUDA_BOOTCAMP_ARCH}>)
 
-# Day 10 时间线练习：复用已验收的 Day 1 Vector Add。
-add_executable(vector_add 01_vector_add/main.cu)
-target_include_directories(vector_add PRIVATE common)
+# Day 1 与 Day 10 时间线练习已完成；需要复查时取消以下两行注释。
+# add_executable(vector_add 01_vector_add/main.cu)
+# target_include_directories(vector_add PRIVATE common)
 
 # Day 2 已完成；需要复查时取消以下两行注释。
 # add_executable(matrix_add 02_matrix_add/main.cu)
@@ -51,9 +51,9 @@ endfunction()
 # add_executable(reduction_v2 04_reduction/v2.cu)
 # target_include_directories(reduction_v2 PRIVATE common)
 
-# Day 10 时间线练习：复用 V3 的多轮依赖规约。
-add_executable(reduction_v3 04_reduction/v3.cu)
-target_include_directories(reduction_v3 PRIVATE common)
+# Reduction V3 与 Day 10 时间线练习已完成；需要复查时取消以下两行注释。
+# add_executable(reduction_v3 04_reduction/v3.cu)
+# target_include_directories(reduction_v3 PRIVATE common)
 
 # Day 7 已完成；需要复查时取消以下目标的注释。
 # add_executable(gemm_naive 05_gemm/naive.cu)
@@ -78,16 +78,15 @@ target_include_directories(reduction_v3 PRIVATE common)
 # add_executable(softmax_v0 07_softmax/v0.cu)
 # target_include_directories(softmax_v0 PRIVATE common 07_softmax)
 
-# Day 9 V1 已完成；需要复查历史对照时取消以下两行注释。
-# add_executable(softmax_v1 07_softmax/v1.cu)
-# target_include_directories(softmax_v1 PRIVATE common 07_softmax)
+# Day 11 单 kernel 分析：复用已验收的 FP32 Softmax V1/V2/V3。
+add_executable(softmax_v1 07_softmax/v1.cu)
+target_include_directories(softmax_v1 PRIVATE common 07_softmax)
 
-# Day 10 时间线练习：复用已验收的 Softmax V2。
 add_executable(softmax_v2 07_softmax/v2.cu)
 target_include_directories(softmax_v2 PRIVATE common 07_softmax)
-# Day 9 FP32 V3 已完成；需要复查时取消以下两行注释。
-# add_executable(softmax_v3 07_softmax/v3.cu)
-# target_include_directories(softmax_v3 PRIVATE common 07_softmax)
+
+add_executable(softmax_v3 07_softmax/v3.cu)
+target_include_directories(softmax_v3 PRIVATE common 07_softmax)
 
 # Day 9 FP16 已完成；同一源码可重新构建标量基线与 half2 练习版。
 function(add_softmax_fp16_target target_name use_half2)

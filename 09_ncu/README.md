@@ -2,6 +2,8 @@
 
 今天不写新 kernel，复用已完成的 FP32 Softmax V1/V2/V3。你负责采集、填写分析与解释，我负责 Review 和梳理证据。目标不是让 V3 一定获胜，而是解释它为什么赢或输。
 
+当前状态：Day 11 基础验收通过，三段收尾答复与导师修正见 [分析笔记](NOTES.md)。本页保留任务与复现实验步骤；下一任务为 [Day 12 综合复盘](../notes/bootcamp_summary.md)，最终独立 Softmax 验收尚未进行。
+
 ## 1. 今天要理解什么
 
 Nsight Systems 看主机提交、搬运、kernel 与 gap 的时间线；Nsight Compute 看某个 kernel 内部的执行与资源使用。今天只关注计划中的六类指标，不扩展到 PTX、极限优化或完整 Roofline 分析。
@@ -137,9 +139,9 @@ ncu --import build/day11_softmax_v1.ncu-rep --page raw
 
 本节通过后才按计划评估综合补缺与最终独立 Softmax 验收。当前框架准备完成不等于 Day 11 或 Bootcamp 已验收。
 
-## 7. 当前收尾任务：用自己的话解释已有结果
+## 7. 收尾任务：用自己的话解释已有结果（已完成 Review）
 
-采集、数据统计与必要理论已完成；当前不新增 kernel，不要求重跑 Benchmark/Profile，也不继续深入底层 stall 实现。待完成的是学习者自己的分析结论。
+以下保留已完成的收尾要求。学习者三段回复已由导师整理进 Notes，并纠正绝对瓶颈表述；不要求继续重跑 Benchmark/Profile 或深入底层 stall 实现。
 
 可以直接回复以下三组问题，每组约 3–5 句话，或填入 Notes 对应小节；不必重复抄完整数据表：
 

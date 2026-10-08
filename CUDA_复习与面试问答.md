@@ -563,6 +563,8 @@ stall 是某个 warp 的下一条指令暂时不能发出。比如读 input 后�
 
 同步是可能的其他成本，但不能证明唯一瓶颈的主要原因是现有证据范围有限。Day 11 较大的 long scoreboard 提示等访存结果，DRAM 吞吐约 35% 未显示带宽饱和，Issue Active 约 22%–24% 提示调查延迟隐藏；合理结论是“优先调查访存结果依赖与延迟隐藏”，不是“全部时间花在 DRAM”。汇总没有定位具体 load、缓存层和阶段，barrier 与固定延迟计算依赖等也未被独立分离。stall ratio 是归一化等待统计，不是总耗时百分比，也不能通过最大值证明优化该项一定决定整体性能。来源：[NVIDIA 调度与 warp 状态说明](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#sections-and-rules)。
 
+Day 11 收尾时学习者提出“瓶颈都在全局内存访问”，该表述需收紧：源码 input 读取与较大的 long scoreboard 支持优先调查访存依赖，但不证明全部成本或唯一瓶颈都来自全局内存。类似地，`(16,512)` 是本轮四个 Benchmark 形状中唯一平均延迟降低的 V3 形状，不是对所有其他形状的性能保证。复习时分开写“测到的变化”“合理调查方向”“尚未证明的原因”。
+
 ### 等待 warp 仍占用 GPU 资源，为什么 scheduler 还能执行其他 warp 来隐藏延迟？
 
 要区分“保存执行状态的容量”和“执行下一条指令的机会”。等待 warp 的寄存器、执行状态仍保留，所属 block 的 shared memory 分配也不因等待而释放；但它不会在等待数据时持续独占算术执行单元。其他已经驻留的 warp 有各自的状态与资源，scheduler 可以选择其中就绪的 warp 发出下一条指令，不是先卸载等待 warp 再装入新 warp，也不需要每次把其寄存器保存到显存。来源：[CUDA 11.8 硬件多线程说明](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-c-programming-guide/index.html#hardware-multithreading)。

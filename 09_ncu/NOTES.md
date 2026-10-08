@@ -1,6 +1,6 @@
 # Softmax Nsight Compute 分析笔记
 
-状态：学习者已于 2026-10-08 提交三轮 Event、三份 ncu 输出和前五个问题的初步回答；导师已完成统计与答复 Review，并补充 warp stall 的最少理论。下面记录实测数据和 Review，最终瓶颈解释与 stall 理解检查仍待学习者完成。仅导入已有报告，没有重新采集或修改 kernel。命令与指标解释见 [Day 11 任务](README.md)。
+状态：Day 11 基础验收通过（2026-10-08）。学习者已提交三轮 Event、三份 ncu 输出与三段收尾分析，导师完成数据整理和 Review；“瓶颈都在全局内存”的绝对表述已由导师收紧，现有数据没有证明唯一瓶颈。下面区分学习者结论与导师核对、修正，未新采集或修改 kernel。下一任务为 [Day 12 综合复盘](../notes/bootcamp_summary.md)，最终独立 Softmax 验收尚未进行。
 
 ## 实验环境与正确性
 
@@ -89,7 +89,7 @@
 
 V2 报告的 block 数、寄存器与 shared 容量限制分别为 16/5/128 block/SM，连同 warp 限制取最小值为 4 block/SM。硬件并非对所有 kernel 都只能驻留 4 个 block；本次 4 个取决于 block 大小与资源需求。于是全卡理论驻留容量为 `68×4=272 block`，实际只有 `128/272≈0.47 wave`。272 是填满当前配置理论容量所需的 block 数，不是 grid 必须设置的数，也不保证一到 272 就能精确测到 100% achieved occupancy。硬件上限参考 [NVIDIA Turing occupancy 说明](https://docs.nvidia.com/cuda/archive/11.8.0/turing-tuning-guide/index.html#occupancy)。
 
-数据核对结论，不替代下面的学习者解释：
+数据核对结论，下面另行记录学习者解释与导师 Review：
 
 - ncu 排序同样为 V2、V3、V1；ncu 中 V2 相对 V1 的加速比为 1.081055×，V3 相对 V2 为 0.984615×。它们与 Event 口径分别计算，没有混用。
 - V1 → V2：shared-load 指令减少约 93.38%，shared-store 减少 87.50%；barrier 的归一化比值从 1.34 降至 1.10，但这不是总同步耗时减少 17.91% 的证明。
@@ -99,45 +99,45 @@ V2 报告的 block 数、寄存器与 shared 容量限制分别为 16/5/128 bloc
 
 ## V1：Shared Memory Tree
 
-- 直接观察：待填写 Duration、shared 指令、主要 stall、occupancy。
-- 对应源码：待填写相关 shared 访问与同步位置。
-- 支持的解释与尚不能确认的部分：待填写。
+- 导师核对基线：Event 平均为 0.007478333 ms，ncu Duration 为 11.07 µs；shared-load/store 为 34816/18432 warp 指令，achieved occupancy 为 43.76%，long scoreboard 为 6.16 cycles/instruction。
+- 源码核对：每线程写出局部 max/sum 到 shared，再分别做 8 轮 tree reduction；两次初始同步与 16 次 tree 同步共 18 个 block barrier 阶段。
+- 学习者把 shared 与同步成本作为 V1 → V2 的可能收益来源；导师补充：计数说明基线的访问与同步工作较多，但不能直接换算为各项耗时占比。
 
 ## V2：Warp Shuffle
 
-- 相对 V1 的直接变化与幅度：待填写。
-- shared 访问/同步变化是否与性能变化一致：待填写。
-- 主要 stall 是否转移，是否有其他成本：待填写。
+- 学习者结论：平均延迟降低约 9%，shared 访问大幅减少，block barrier 从 18 个阶段降至 4 个；这些变化支持优化，但无法分离两种成本各自的收益。这里的 9% 按本轮主要形状 `(128,4096)` 核对。
+- 导师核对：Event 平均从 0.007478333 ms 降至 0.006805333 ms；shared-load 从 34816 降至 2304 warp 指令，减少 93.38%，shared-store 从 18432 降至 2304 warp 指令，减少 87.50%。两级 warp shuffle 规约只用 shared 交换 warp partial 与行标量，max/sum 各有两次 block barrier。
+- 导师补充：ncu Duration 从 11.07 µs 降至 10.24 µs，排序支持收益；但 barrier ratio 1.34 → 1.10 不是同步耗时分解。long scoreboard 仍是记录的主要等待项，6.16 → 6.57 cycles/instruction 的比值变化也不证明绝对等待耗时增加。
 
 ## V3：float4 向量化
 
-- 相对 V2 的 request、sector、Duration 变化：待填写。
-- occupancy 与主要 stall 的变化：待填写。
-- 有哪些证据支持或不支持 float4 的收益：待填写。
+- 学习者结论：本轮 `(16,512)` 是唯一平均延迟降低的测试形状；请求减少而总 sector 不变，向量化不保证更快。范围限定为本轮四个 Benchmark 形状，而不是所有形状或所有环境。
+- 导师核对主要形状 `(128,4096)`：global-load request 从 49152 降至 12288 request，减少 75%；总 sector 仍为 196608 sector，sector/request 为 4 → 16。Event 平均从 0.006805333 ms 增至 0.006858667 ms，慢约 0.78%；ncu Duration 为 10.24 → 10.40 µs。
+- 导师补充：规约仍沿用 V2，输入按 float4 分组，但指数与累加仍逐分量执行；访存请求减少不是全部工作的等比例减少。long scoreboard 为 6.57 → 8.24 cycles/instruction；每线程寄存器为 41 → 64，但 theoretical occupancy 均为 100%，achieved 为 43.43% → 44.40%，不能把轻微回退直接归因为 occupancy 下降。
 
 ## 瓶颈判断
 
-- 最可能的限制因素：待填写，可以写“现有数据不足以单一归类”。
-- 支持判断的至少两项指标及源码理由：待填写。
-- 为什么不能只用 DRAM 或 occupancy 一个数下结论：待填写。
-- 哪些原因仍属推断，若需确认应补什么最小验证：待填写，不必先做额外大实验。
+- 学习者原始判断：“瓶颈都在全局内存访问上，需要优先调查全局内存访问。”导师修正：优先调查 input 读取的结果依赖与延迟隐藏，但不能认定所有瓶颈都在全局内存，也不能认定 DRAM 带宽已饱和。
+- 导师证据链：三版 long scoreboard 为 6.16/6.57/8.24 cycles/instruction，DRAM 吞吐约 33%–36%，Issue Active 约 24%/24%/22%。源码的 max、指数和与输出阶段都读取 input，后续计算依赖所读结果，因此访存依赖是合理调查方向；汇总尚未定位具体 load、缓存层与阶段。
+- 学习者已正确修正 occupancy：等待 warp 仍在 SM 上保留资源、计入 occupancy；缺少就绪 warp 会影响发出指令的机会。occupancy 不能替代就绪程度，低 DRAM 百分比也不能排除访存延迟限制。
+- 尚未证明：shared 与同步各自的收益贡献、唯一瓶颈及 V3 轻微回退的精确原因。若后续需要确认，应针对候选原因设计单变量对照，并复查正确性、Event 与对应 Profile 指标；本节不追加实验。等待原因定义见 [NVIDIA Profile 指南](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#warp-stall-reasons)。
 
 ## 为什么 V3 赢或输
 
-- Event 是否稳定更快，ncu 排序是否一致：待填写。
-- request 减少是否伴随实际 DRAM 字节吞吐/总字节量变化：待填写；仅 GB/s 的升降也受 Duration 影响，不能等同于总流量变化。
-- 结论：待填写；允许“无稳定收益”，不得预设向量化一定更快。
+- 学习者结论：向量化未获得全部测试形状的一致收益。导师核对：本轮 `(16,512)` 平均延迟降低约 5.51%；其他三个形状平均未降低，主要形状三轮配对均稍慢，Event 与 ncu 的主要形状排序均为 V2、V3、V1。
+- 本次 request 减少没有伴随 L1/TEX load 总 sector 减少；这不等于已证明 DRAM 总字节量不变。实际 DRAM 吞吐 204.87 → 201.78 GB/s 还受 Duration 影响，不能将 GB/s 升降直接当作总流量变化。
+- 最终结论：request 减少是直接测量结果，性能是否改善取决于完整 kernel 与形状。当前可以确认收益依条件而异，但不能用单一计数器解释所有赢输原因。
 
 ## 六个问题的回答与 Review 状态
 
-按任务 README 第 5 节逐项作答；可引用上面的分析，不用重复抄写完整段落。
+以下保留初次回答与当时的 Review，便于复习误区；本次收尾答复与最终状态见文末。
 
 1. 学习者：“向量化不一定会带来稳定的收益。”Review：方向正确；需结合三轮波动限定结论，区分主要形状的轻微回退和其他形状的收益。
 2. 学习者：“shared-load/store 次数大幅下降支持收益；barrier 变化不大是否证明同步影响不大？”Review：前半正确，但指标精确地说是 warp 级 shared 访存指令数；配合 Event 变快支持优化，而非仅靠计数下降证明速度。后半不能成立：本次 barrier 是按发出指令归一化的比值，不是同步耗时。源码中 V1 有 `2×(1+8)=18` 个 block barrier 阶段，V2 有 4 个；shared 与 barrier 同时改变，现有对照没有独立分离二者的收益贡献。
 3. 学习者：“每个 warp 从 FP32 变成 float4，sector/request 从 4 变成 16，request 降为四分之一，总数不变。”Review：正确；更精确地说是每个 lane 一条加载从 4 字节变成 16 字节，满 warp 覆盖量从 128 字节变为 512 字节。本次 `49152×4=12288×16=196608 sector`，这是 L1/TEX 请求覆盖量，不是 DRAM 总流量。
 4. 学习者：“不能只看 DRAM；还有同步等开销。”Review：正确；再区分访存带宽限制与访存延迟/依赖等待。带宽未满也可能在等数据，不能反过来直接断言 compute-bound。
 5. 学习者：“实际利用率约 44%，可能因为任务短、并行程度不够。”Review：方向正确，但这个数是驻留 warp 占 SM 容量的比例，不是全卡利用率；等待数据或 barrier 的驻留 warp 也计入 occupancy。本卡 68 个 SM、每 SM 最多 32 个 warp，每 block 8 个 warp，理论容量允许 4 block/SM；填满这些容量需 272 个 block，本轮只有 128 个。`Waves Per SM=0.47` 支持工作量不足一整波的解释；短 kernel 的起止阶段还可能影响平均值，但“运行时间短”本身不必然导致低 occupancy。
-6. 学习者询问：“stall 具体是什么，要结合哪些参数分析？”导师讲解：见下面的方法与 [复习问答](../CUDA_复习与面试问答.md#11-nsight-compute-单-kernel-分析)。本题尚未由学习者独立解释本轮瓶颈，不标记通过。
+6. 学习者询问：“stall 具体是什么，要结合哪些参数分析？”当时导师讲解：见下面的方法与 [复习问答](../CUDA_复习与面试问答.md#11-nsight-compute-单-kernel-分析)。初次提问不作为独立分析，后续收尾答复与修正见文末。
 
 ## Warp stall 的最少分析方法
 
@@ -164,6 +164,10 @@ stall 是某个 warp 的下一条指令暂时不能发出，例如要用的数�
 
 后续提问：“等待 warp 还占用资源，如何调度其他 warp 隐藏延迟？”导师讲解：寄存器、执行状态与 block 的 shared 分配保留，不代表持续独占算术执行单元。scheduler 从已经驻留且就绪的 warp 中选择下一条指令，不需要先释放等待 warp 的资源。用其他 warp 的独立工作覆盖等待，不是缩短读取本身；若所有候选 warp 都不就绪，仍可能空闲。示意时间线已记录在 [复习问答](../CUDA_复习与面试问答.md#11-nsight-compute-单-kernel-分析)，不将此次提问标作已完成独立分析。
 
-下一步：学习者修正第 1 条，并用自己的话复述第 2 条的证据链；无需新增采集或修改 kernel。可用“16 个驻留 warp、12 个等待、4 个就绪”检查是否区分了 occupancy 与就绪程度。
+## 三段收尾答复与最终 Review
 
-Review：理解检查已收到初步回答并完成讲解；等待学习者修正 occupancy 因果关系、形成自己的有限瓶颈解释。Day 11 暂不标记验收通过，最终独立 Softmax 验收仍未进行。
+1. 学习者：平均延迟降低 9%；shared 访问减少，block barrier 从 18 个阶段变成 4 个，两类变化可能带来收益，但不能分离收益贡献。Review：通过，数据和证据边界正确。
+2. 学习者：`(16,512)` 是唯一延迟降低的形状；request 减少而 sector 总数一致，不保证更快。Review：通过，限定为本轮四个形状与同轮测量条件。
+3. 学习者：优先调查全局内存访问；等待 warp 仍驻留并计入 occupancy，无就绪 warp 时影响指令执行。Review：调度与 occupancy 解释正确；“瓶颈都在全局内存”过于绝对，导师修正为优先调查访存结果依赖与延迟隐藏，尚未证明唯一瓶颈。
+
+最终 Review：Day 11 基础验收通过。学习者已完成既有 kernel 的对照采集、性能比较与基本指标解释，导师已明确收紧绝对瓶颈表述；具体因果定位不属于本节必须深挖的目标，证据与推断的区分继续在综合复盘中巩固。下一任务为 [Day 12 综合复盘](../notes/bootcamp_summary.md)，最终独立 Softmax 验收仍未进行。

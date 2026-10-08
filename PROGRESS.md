@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 11 — 两个理解检查已收到初步回答并完成讲解；等待学习者修正等待与 occupancy 的因果关系、复述有限瓶颈判断，最终独立 Softmax 验收尚未进行
+Day 11 — 已进一步讲解驻留资源保留与 warp 调度隐藏延迟的关系；等待学习者复述 occupancy 与有限瓶颈判断，最终独立 Softmax 验收尚未进行
 
 ## 已完成
 
@@ -603,6 +603,7 @@ Day 11 — 两个理解检查已收到初步回答并完成讲解；等待学习
 - 学习者已正确说明其他 warp 可以执行来隐藏等待，但仍将等待计入 occupancy 推导成 occupancy 下降；已用 16 个驻留、12 个等待、4 个就绪的例子纠正，并区分驻留、就绪与发出状态。
 - 已只读导入原有 V2 报告，确认 SM 数 68、warp 大小 32 thread、每 SM 上限 32 warp、block 大小 256 thread，以及各资源的驻留限制；补充 `256/32=8 warp/block`、`32/8=4 block/SM`、`68×4=272 block` 与实际 `128/272≈0.47 wave` 的数值来源，未新采集或改 kernel。
 - 已进一步讲解：同步只是不能排除的成本之一；long scoreboard、DRAM 与 Issue Active 支持优先调查访存依赖等待，但没有定位具体 load、缓存层或阶段，不能证明唯一瓶颈。
+- 学习者进一步询问等待 warp 保留资源时如何调度；已区分保存状态的容量与执行指令的机会，用两个驻留 warp 的示意时间线说明 scheduler 选择其他就绪 warp，无须先释放等待 warp 的资源。已记录到复习问答，没有改 kernel 或新采集。
 
 ## 当前问题
 
@@ -619,6 +620,7 @@ Day 11 — 两个理解检查已收到初步回答并完成讲解；等待学习
 - 性能百分比不是评分：本轮更快的 V2，SM Throughput 与 achieved occupancy 都比 V1 略低；V3 request 更少、occupancy 略高，却未在主要形状继续加速。
 - warp stall 表示下一条指令暂时不能发出；其他就绪 warp 可以继续执行，这就是延迟隐藏。等待中的驻留 warp 仍计入 occupancy，它不是“正在计算”的 warp 比例。
 - 等待不会自动移除驻留 warp；等待可能减少就绪 warp 和发出指令机会，而非直接降低 occupancy。当前 4 block/SM 由每 block 8 warp 与 Turing 的 32 warp/SM 推导，并需检查其他资源限制，不是所有 kernel 固定的 block 上限。
+- 隐藏延迟是用其他驻留 warp 的独立工作覆盖等待，不是缩短访存本身，也不是每次将等待 warp 卸载。寄存器与 block 的 shared 分配仍保留，但等待不代表持续独占算术执行单元；全部候选 warp 都不就绪时仍可能空闲。
 - 长 scoreboard 等 L1/TEX 路径的结果依赖，不等于 DRAM 带宽饱和；本轮配合 Issue Active、DRAM 吞吐、request/sector、驻留 warp 与源码调查，不把最大 stall 直接当作唯一瓶颈。
 - 本轮源码中的 block barrier 阶段从 V1 的 18 个降到 V2 的 4 个，但 shared 与同步同时变化，现有实验没有独立分离各自的加速贡献；归一化 barrier ratio 不能代替总同步耗时。
 - `float4` 每组覆盖四个相邻 FP32 元素；必须检查行首实际地址的

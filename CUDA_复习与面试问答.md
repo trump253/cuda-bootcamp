@@ -848,3 +848,23 @@ PATH 中未找到 Docker/Podman，不能把文档支持视为部署已经成功�
 
 来源：[NVIDIA NGC Nsight Streamer](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/devtools/containers/nsight-streamer-nsys)、
 [Nsight Systems User Guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html)。
+
+### 已在容器内，而且只能操作当前容器，怎么查看报告？
+
+先区分当前容器和宿主机。容器内没有 Docker 命令，不代表宿主机
+没有 Docker；要按官方 Docker 方式启动 Streamer，还需要能访问
+Docker daemon。当前容器既没有 Docker socket，也未配置远程
+Docker 地址，因此目前没有可直接使用的启动入口。
+
+其他容器也不会自动看到当前容器里的报告。Docker bind mount 的
+源路径属于 daemon 所在宿主机，不能直接把当前容器路径当作
+宿主机路径，需要共享存储或先复制报告。
+
+当前报告各约 150 KiB，建议下载到本地 Nsight Systems GUI。
+若需要浏览器界面，可在当前容器内配置虚拟显示（如 Xvfb）、
+VNC server 和 noVNC，再运行已有的 `nsys-ui`；这一路线无需
+创建新容器，但需要安装相关依赖，并确认端口能经 SSH 隧道或
+平台转发从浏览器访问。目前该路线尚未部署验证。
+
+来源：[Docker bind mount 文档](https://docs.docker.com/engine/storage/bind-mounts/)、
+[noVNC 官方说明](https://github.com/novnc/noVNC)。

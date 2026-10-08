@@ -1,10 +1,14 @@
 # 容器内使用 Nsight Systems GUI
 
-本指南针对当前 Ubuntu 20.04 容器、Nsight Systems 2022.4.2，以及 SSH / VS Code Remote SSH 连接方式。2026-10-08 已补齐动态库并启动 Xvfb、Openbox、x11vnc 和 noVNC；当前会话先从下面的端口转发开始。
+本指南针对当前 Ubuntu 20.04 容器、Nsight Systems 2022.4.2，以及 SSH / VS Code Remote SSH 连接方式。2026-10-08 已补齐动态库并启动 Xvfb、Openbox、x11vnc 和 noVNC；随后将 noVNC 升级到 1.7.0，配置简体中文并缩短 VNC 更新等待时间。当前会话先从下面的端口转发开始。
 
 ## 在本地看到界面
 
-使用 VS Code Remote SSH 时，打开“端口 / Ports”面板，选择“转发端口”，输入远程端口 `6080`。在本地浏览器打开转发后的地址，并访问 `/vnc.html`，点击“连接 / Connect”。如果 VS Code 分配的本地端口也是 `6080`，地址就是 `http://127.0.0.1:6080/vnc.html`。
+使用 VS Code Remote SSH 时，打开“端口 / Ports”面板，选择“转发端口”，输入远程端口 `6080`。在本地浏览器打开转发后的地址，并访问 `/noVNC-1.7.0/vnc.html`。如果 VS Code 分配的本地端口也是 `6080`，使用下面的入口，页面会自动连接：
+
+<http://127.0.0.1:6080/noVNC-1.7.0/vnc.html?autoconnect=true&resize=scale&quality=5&compression=2>
+
+如果本地端口不同，替换地址中的 `6080`。版本路径让整套网页和 JavaScript 资源使用新地址，避免新网页混用旧版模块；旧 `/vnc.html` 入口会跳转到新路径。参数也会覆盖浏览器此前保存的画质设置。
 
 使用普通 SSH 时，在**本地电脑的终端**运行下面的命令，把 `your-container` 换成平时连接这个容器的 SSH 别名或目标；需要特殊 SSH 端口或跳板机时沿用原来的参数。
 
@@ -12,7 +16,7 @@
 ssh -N -L 6080:127.0.0.1:6080 your-container
 ```
 
-保持隧道运行，在本地浏览器打开 `http://127.0.0.1:6080/vnc.html` 并点击“连接”。转发目标应是当前容器的网络环境。noVNC 与 VNC 只监听容器的回环地址，通过 SSH 访问。
+保持隧道运行，在本地浏览器打开上面的入口。转发目标应是当前容器的网络环境。noVNC 与 VNC 只监听容器的回环地址，通过 SSH 访问。
 
 ## 打开与观察报告
 
@@ -30,6 +34,16 @@ nsys-ui build/day10_vector_add.nsys-rep
 
 打开报告后，展开 GPU 下的 CUDA HW 行查看 kernel 与内存传输，再查看进程/线程下的 CUDA API 行。先缩放到第二组较大的 Vector Add 用例，按 [README.md](README.md) 的四个问题记录 CPU 调用、GPU 执行和同步。启动 GUI 的环境验证不替代 Day 10 的时间线分析验收。
 
+## 简体中文与画面流畅度
+
+Ubuntu 自带的 noVNC 1.0 中文翻译使用繁体。本次使用官方 noVNC 1.7.0 的 `zh_CN` 翻译，并固定这个浏览器入口使用简体中文；侧边栏的“连接”“设置”“剪贴板”等已验证。Nsight Systems 程序本身的菜单仍为英文。
+
+升级初次刷新时，学习者遇到 `addTouchSpecificHandlers` 中对 `null` 调用 `addEventListener` 的错误，同时侧边栏仍为繁体；堆栈对应旧版脚本与新版网页混用。已改成上述版本路径，遇到这个现象时在新标签页直接打开新入口。
+
+当前画质为 `5`、压缩等级为 `2`，两者的范围都是 `0–9`。网络较慢时可以在侧边栏“设置”中适当降低画质，减少传输量；字迹变模糊时提高画质。压缩等级越高通常越省带宽，也会增加服务端编码负担。URL 中的参数优先于保存的设置，重新用上述入口打开时会恢复这组参数。
+
+x11vnc 已启用 X DAMAGE，更新等待设置为 `-wait 5 -defer 5`，并使用 `-sb 0` 关闭长时间静止后的慢速轮询。当前显示服务支持 DAMAGE；这些设置会增加轮询频率。本机通过 WebSocket/RFB 测量桌面小区域更新，优化前后各 20 次的延迟中位数约为 `74 ms → 13 ms`。此结果衡量容器内画面更新，不是本地浏览器的 FPS；实际拖动、缩放还受 SSH 网络、画面变化量和 GUI 软件渲染影响。
+
 ## 容器重启后重新启动
 
 当前组件已经运行。以下步骤用于显示服务退出后重建；重新创建容器时还需要再次安装依赖。命令从仓库根目录执行。
@@ -37,10 +51,16 @@ nsys-ui build/day10_vector_add.nsys-rep
 ```bash
 apt-get install -y --no-install-recommends \
   libopengl0 libegl1 libegl-mesa0 libnss3 libnspr4 libjpeg62 \
-  xvfb mesa-utils x11-utils xauth openbox x11vnc novnc websockify
+  xvfb mesa-utils x11-utils xauth openbox x11vnc websockify python3
 ```
 
-启动虚拟显示并确认它已经就绪，再启动桌面与浏览器转发。日志和 PID 写到被 Git 忽略的 `build/nsys-gui/`。
+准备官方固定版本的 noVNC 网页资源。脚本验证下载归档的 SHA-256，设置简体中文和默认画质；重复运行会重新生成相同配置。需要容器能访问 GitHub 下载地址，已下载的归档会复用。
+
+```bash
+python3 08_nsys/configure_novnc.py
+```
+
+启动虚拟显示并确认它已经就绪，再启动桌面与浏览器转发。网页资源、日志和 PID 写到被 Git 忽略的 `build/nsys-gui/`。
 
 ```bash
 mkdir -p build/nsys-gui
@@ -62,11 +82,11 @@ nohup env DISPLAY=:99 /usr/bin/openbox \
 printf '%s\n' "$!" >build/nsys-gui/openbox.pid
 
 nohup /usr/bin/x11vnc -display :99 -localhost -rfbport 5901 \
-  -forever -shared -nopw -noxdamage \
+  -forever -shared -nopw -xdamage -wait 5 -defer 5 -sb 0 \
   >build/nsys-gui/x11vnc.log 2>&1 </dev/null &
 printf '%s\n' "$!" >build/nsys-gui/x11vnc.pid
 
-nohup /usr/bin/websockify --web=/usr/share/novnc \
+nohup /usr/bin/websockify --verbose --web="$PWD/build/nsys-gui/web" \
   127.0.0.1:6080 127.0.0.1:5901 \
   >build/nsys-gui/websockify.log 2>&1 </dev/null &
 printf '%s\n' "$!" >build/nsys-gui/websockify.pid
@@ -80,4 +100,4 @@ printf '%s\n' "$!" >build/nsys-gui/websockify.pid
 
 `nsys-ui` 启动脚本会先探测 OpenGL，再决定是否回退到软件渲染。没有显示服务时，探测也会失败，因此报出的 OpenGL 版本 `0` 不能直接用来判断 GPU 的硬件能力。动态库、显示入口和实际渲染能力需要分别检查。
 
-来源：[NVIDIA GUI 故障排查](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#gui-troubleshooting)、[noVNC 官方说明](https://github.com/novnc/noVNC)。
+来源：[NVIDIA GUI 故障排查](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#gui-troubleshooting)、[noVNC 1.7.0 官方发布](https://github.com/novnc/noVNC/releases/tag/v1.7.0)、[noVNC 画质与配置说明](https://novnc.com/noVNC/docs/EMBEDDING.html)。

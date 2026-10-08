@@ -484,3 +484,9 @@ V1 `if (tid<stride)` 中实际参与的 warp 会随 stride 减少，不能把上
 OpenGL 版本为 `0` 表示启动器的探测没有得到可用结果，不足以判断显卡的硬件能力。当前 SSH 会话没有 `DISPLAY` 或显示服务；补库后还需提供显示入口。本次使用 Xvfb 虚拟显示、Mesa llvmpipe 软件渲染，`glxinfo -B` 和 GUI 日志均确认 OpenGL 3.1。
 
 Xvfb 只提供容器内的虚拟屏幕，想在本地看到它还需 VNC/noVNC 与 SSH 端口转发。当前入口是远程端口 `6080`，GUI 环境变量与连接步骤见 [容器内 GUI 指南](08_nsys/GUI.md)。
+
+### 浏览器里拖动时间线很卡，能说明被分析的 CUDA kernel 很慢吗？
+
+不能。查看已有 `.nsys-rep` 时，浏览器看到的是 GUI 的画面更新；流畅度受服务端 GUI 渲染、VNC 画面检测与编码、SSH 网络和浏览器解码影响。kernel 性能应读取报告中的 GPU 执行时间，并结合 CUDA Event Benchmark 判断。本次启用 X DAMAGE、缩短 VNC 更新等待后，容器内小区域更新的延迟中位数从约 74 ms 降至 13 ms；这只验证了本机画面传输链路的改善，不代表 kernel 加速，也不等于本地浏览器 FPS。
+
+降低 noVNC 画质通常能减少传输量，但可能让时间线文字变模糊；提高压缩等级会增加服务端编码负担。当前简体中文入口、默认设置和重启步骤见 [容器内 GUI 指南](08_nsys/GUI.md)。

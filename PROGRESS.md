@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 10 — 容器内 Nsight Systems GUI 与 noVNC 已启动并验证；三份正式报告的完整采集与解释尚未完成，最终独立 Softmax 验收尚未进行
+Day 10 — 学习者已提交三份时间线截图；Vector Add 与 Softmax 数值已复核，Reduction gap 与短 kernel 开销解释待补全，最终独立 Softmax 验收尚未进行
 
 ## 已完成
 
@@ -569,11 +569,23 @@ Day 10 — 容器内 Nsight Systems GUI 与 noVNC 已启动并验证；三份正
 - 学习者进一步明确希望保留“目录首页 → 点击 `vnc.html`”的入口。
   已移除生成的 `index.html`，恢复服务器目录首页；桌面入口仍加载
   版本目录资源，两个入口均无强制跳转。GUI 指南与资源准备脚本已同步。
+- 2026-10-08：学习者已提交 Vector Add、Softmax V2、Reduction V3
+  三份 GUI 时间线截图，并解释前两份的 CPU API 与 GPU 活动位置。
+  已从已有报告复核，未重新采集或改动 kernel。
+- Vector Add 最后一个用例的两次 H2D API 持续 438.559/451.797 µs；
+  start-to-start latency 为 97.345/167.495 µs，GPU 传输持续
+  428.925/373.918 µs。`cudaDeviceSynchronize` 持续 101.907 µs，
+  包含仍未完成的第二次 H2D 与 kernel 等待；kernel 自身为 20.255 µs。
+- Softmax launch API 持续 166.040 µs，GPU kernel 持续 8.640 µs；
+  start-to-start latency 为 164.139 µs。GPU 开始早于 API 返回
+  1.901 µs，说明主机调用与设备执行可部分重叠。初步回答的
+  64.139 µs 已更正，数据与口径整理在 `08_nsys/NOTES.md`。
 
 ## 当前问题
 
-- Day 10 的三份正式报告与四个时间线问题仍待学习者完成；
-  Day 11 与最终独立 Softmax 验收尚未进行。
+- 三份 Day 10 报告已生成并提交截图；Reduction 的 GPU 三轮
+  Start/Duration、相邻 gap 和短 kernel 开销比较仍待学习者解释。
+  本次提交尚未包含程序退出码与 Reduction 最终结果；Day 10 尚未验收。
 
 ## 今日关键知识
 
@@ -625,12 +637,15 @@ Day 10 — 容器内 Nsight Systems GUI 与 noVNC 已启动并验证；三份正
 - 浏览器里拖动时间线的流畅度受 GUI 渲染、VNC 更新与编码、网络和
   浏览器解码影响；分析 CUDA kernel 时应读取报告中的 GPU 时间段，
   不应把远程桌面的画面帧率当作 kernel 性能。
+- CPU API Duration、GPU 工作 Duration 与 start-to-start Latency
+  是三个不同指标；调用区间与 GPU 区间可重叠，不能相加成总时间。
+- Pageable H2D 的 `cudaMemcpy` 可能在设备搬运完成前返回；
+  `cudaDeviceSynchronize` 等待先前提交的设备工作，不仅是最后一个 kernel。
 
 ## 下一任务
 
-- 在已连接的 GUI 中展开 GPU 与 CUDA API 行，完成 Vector Add
-  报告的时间线观察；需要重启或打开其他报告时参考 `08_nsys/GUI.md`。
-- 学习者按照 `08_nsys/README.md` 亲自采集 Vector Add、Softmax V2、
-  Reduction V3 三份报告，填写 `08_nsys/NOTES.md`，提交关键截图
-  或 CLI 片段及四个问题的答案供 Review。达到 Day 10 验收后再进入
-  Day 11 单 kernel Nsight Compute 对照。
+- 学习者继续在已有 Reduction 报告中读取 GPU 三轮 Start/Duration，
+  用 `下一轮 GPU Start − 本轮 GPU End` 计算 gap，解释同 stream
+  的执行顺序；比较最后两轮的 CPU launch 与 GPU Duration，
+  判断短 kernel 主机提交开销是否显著，并补交退出码/最终结果。
+  概念复核后完成 Day 10 验收，再进入 Day 11。

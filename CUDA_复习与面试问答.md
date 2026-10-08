@@ -502,3 +502,33 @@ Xvfb 只提供容器内的虚拟屏幕，想在本地看到它还需 VNC/noVNC �
 ### 查看已有 `.nsys-rep`，需要先创建一个 Project 吗？
 
 不需要。报告可以通过 `File → Open` 独立打开；`.qdproj` 保存项目配置，与 `.nsys-rep` 报告是不同的文件。误建空项目时，本机 Nsight Systems 2022.4.2 可先右键选择 `Unload`，再次右键选择 `Remove Project` 将其移出列表；磁盘目录仍会保留，需要另行清理。来源：[NVIDIA 已有报告的打开与共享说明](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#opening-an-existing-report)。
+
+### 时间线中的 API Duration、GPU Duration 和 Latency 分别怎么算？
+
+API Duration 是 `CPU API 返回 − CPU API 开始`；GPU Duration 是
+`GPU 工作结束 − GPU 工作开始`；本次 GUI 的 Latency 是
+`GPU 工作开始 − CPU API 开始`。Vector Add 两次 H2D 的
+97.345/167.495 µs 是启动间隔，实际 GPU 传输持续
+428.925/373.918 µs。不能将 Latency 当作搬运或 kernel 执行时间。
+来源：[NVIDIA latency 与 overhead 说明](https://developer.nvidia.com/blog/understanding-the-visualization-of-overhead-and-latency-in-nsight-systems/)。
+
+### kernel 是异步启动的，GPU 必须等 CPU API 返回后才能执行吗？
+
+不必。本次 Softmax API 在 773245.892 µs 开始，持续 166.040 µs，
+在 773411.932 µs 返回；GPU 在 773410.031 µs 已开始，运行
+8.640 µs。API 与 GPU 工作重叠了 1.901 µs，start-to-start
+latency 为 164.139 µs。异步语义允许主机在设备工作全部完成前
+继续执行，不保证两侧区间完全分离。该程序只启动一次目标 kernel，
+不能把首次调用的长持续时间推广为稳态 launch 开销。
+
+### 为什么 `cudaMemcpy` 返回后，`cudaDeviceSynchronize` 还会等待 H2D？
+
+本次输入来自普通 `std::vector`，报告显示 Pageable。CUDA 11.8
+规定 pageable H2D `cudaMemcpy` 可在主机暂存复制完成后返回，
+而 DMA 到最终设备地址可能尚未完成。Vector Add 第二次 H2D
+API 在 819640.031 µs 返回，GPU 传输在 819729.647 µs 才结束；
+设备同步于 819658.072 µs 开始，因此还在等待 H2D，随后才是
+kernel。同步 API 持续 101.907 µs，kernel 自身持续 20.255 µs；
+同步耗时不能直接代表最后一个 kernel 的耗时。D2H 到主机的
+`cudaMemcpy` 则在复制完成后才返回。
+来源：[CUDA 11.8 API 同步行为](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-runtime-api/api-sync-behavior.html)。

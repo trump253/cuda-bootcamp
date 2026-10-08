@@ -16,6 +16,13 @@ GPU kernel 与相邻 kernel 之间的空隙。复用已验收的 kernel，今天
   Profile 会扰动执行，不把其中的绝对耗时直接当作普通运行的基线。
 - 首次 CUDA 调用可能包含上下文初始化，首次 kernel 启动还可能
   包含模块加载；不要拿它们直接代表稳态 launch overhead。
+- 查看字段时区分三种时间：CPU API 的 Duration 是调用持续时间，
+  GPU 事件的 Duration 是设备工作持续时间，Latency 是关联的
+  GPU 工作开始时间减去 CPU API 开始时间。CPU API 与 GPU 工作
+  可以部分重叠，不能把这些时间直接相加。
+- 本练习的 Vector Add 使用 pageable 主机输入；H2D `cudaMemcpy`
+  返回时 GPU 传输可能仍在执行，后面的设备同步会等待这些工作。
+  语义见 [CUDA 11.8 API 同步行为](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-runtime-api/api-sync-behavior.html)。
 
 ## 实验对象与接口
 

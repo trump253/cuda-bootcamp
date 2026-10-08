@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 12 综合复盘 — 10 个回答已提交，首轮 Review 完成，第 4–7 题待补充；最终独立 Softmax 验收尚未开始
+Day 12 综合复盘已通过 — 第 4–7 题修订已复审；下一阶段为最终独立 Softmax 验收，尚未开始
 
 ## 已完成
 
@@ -610,16 +610,21 @@ Day 12 综合复盘 — 10 个回答已提交，首轮 Review 完成，第 4–7
 - 已创建 `notes/bootcamp_summary.md`，只包含计划中的 10 个已遇到的复盘问题和空回答区；未填答案、改 kernel、改 CMake 或新采集。复盘后再准备最终独立 Softmax 验收，RMSNorm/fusion 不自动新增为必做内容。
 - 2026-10-08：学习者已填写全部 10 个复盘回答；导师保留原始答案并完成逐题反馈。SIMT、两种 Nsight 工具的分工与等待 warp 仍计入 occupancy 的方向正确；规约合并过程、访存/计算限制的判断与 Event 测量流程仍需复述。
 - 已将复盘补充范围收敛到第 4–7 题，接受直接在对话中提交，不重写全部十题、不新采集。已明确 4 sector 的访问宽度/对齐条件、shared 的共享范围与容量口径，以及 RMSNorm/fusion 不属于额外毕业条件；未修改源码或创建最终验收 kernel。
+- 2026-10-08：学习者再次提交第 4–7 题修订，已更正 shuffle 与跨 warp shared 交接、访存带宽/延迟限制和计算能力限制，并补齐暖机、同 stream Event、同步、重复求平均与多轮测量流程。结合此前已验收实现与实验，Day 12 综合复盘通过，不再要求重复改写答案。
+- 复审保持学习者全部十个回答原文，并保留首轮反馈；未将第 2、3、10 题的导师修正记成学习者自行修改。已补充 barrier 和暖机/稳态 launch 成本的精确边界，独立实现能力留到最终 Softmax 验收检验；本次仅修改文档，未创建源文件、改 CMake 或采集新实验。
 
 ## 当前问题
 
 - Day 10 未将亚微秒 gap 的内部成因与 GPU 纯计算占比独立分解；
   不影响本节定位时间线与区分证据/推断的验收。
 - Day 11 基础验收已通过，但未证明唯一瓶颈、同步贡献和 V3 回退的精确原因；这些不是本节必须追加实验的目标。采集时同卡其他任务及各次程序退出码未在日志中单列，限制结果的推广，不将其写成跨环境保证。
-- Day 12 已提交全部十题，但第 4 题未解释树形规约过程，第 5–6 题仍以吞吐表象定义瓶颈，第 7 题缺少具体测量流程；待学习者补充这四题后再判断复盘是否通过。最终独立 Softmax 验收尚未开始。
+- Day 12 复盘通过，但不能代替从空文件独立实现的证据。最终独立 Softmax 验收尚未开始；需独立落实规约、边界、同步、正确性、Event Benchmark、至少两版优化、Nsight Compute 与 Notes。
 
 ## 今日关键知识
 
+- 复盘答案与已有代码/实验合并 Review，可结束书面概念复盘；没有因此证明新 kernel 的独立实现能力，最终 Softmax 验收仍必须实际完成。
+- 暖机处理首次初始化、首次执行与升频等非稳态影响，不会消除每次 launch 的稳态成本；本框架 start/stop 包住整个重复循环，同步 stop 后按 iterations 求平均，计时外做分配/传输与正确性检查。
+- 各 warp 的 partial 写 shared 后必须同步再读取；共享的行 max/sum 写好后也要同步，不能只交换寄存器就认为跨 warp 已可见。
 - Shuffle 寄存器交换不等于广播；当前 down-shuffle 按 16、8、4、2、1 逐轮合并，lane 0 使用 warp 的最终 sum/max，再通过 shared 与 block barrier 做跨 warp 交接。
 - 4 sector 是 32 个活跃 lane 各读取连续且按 sector 对齐的 4 字节值的特例；每 lane 连续读一个 16 字节 float4 时，16 sector 仍可完全合并。缓存层 sector 不直接等于 DRAM 字节数。
 - memory-bound 不要求 DRAM 带宽跑满，访存延迟与延迟隐藏也可能限制性能；compute-bound 不能只凭高 SM Throughput、低 DRAM 推定。需要结合当前 workload、相关管线/等待与对照测量。
@@ -696,6 +701,6 @@ Day 12 综合复盘 — 10 个回答已提交，首轮 Review 完成，第 4–7
 
 ## 下一任务
 
-- 学习者只补充 `notes/bootcamp_summary.md` 第 4–7 题：结合 Softmax V2 描述两级规约，用已有 Day 11/GEMM 数据区分瓶颈假设与证据，并按顺序描述 Event Benchmark。可直接在对话中提交，不要求背长指标名或重写全部十题。
-- 导师核对这些实际缺口后再判断复盘是否通过；第 2、3、10 题的表述边界已记录供复习，不额外增加实验或 CUDA 主题。
-- 复盘 Review 通过后，准备从空源文件开始的最终独立 Softmax 验收；保留 Reference → Naive → Correctness → Benchmark → Profile → 两版优化 → Re-benchmark → Notes 闭环，不复制旧 kernel。RMSNorm/fusion 为可选补缺，不自动追加。
+- 下一阶段为计划第 13 节：从空源文件开始的最终独立 Softmax 验收，不复制旧完整 kernel；当前尚未创建框架或开始实现，不再追加书面复盘作业。
+- 最终任务保留 Reference → Naive → Correctness → Benchmark → Profile → 至少两版优化 → Re-benchmark → Notes 闭环，核心实现与实验由学习者完成；导师只提供接口、测试支撑与 Review。
+- RMSNorm/fusion 为可选练习，不追加为毕业条件。最终验收通过后进入 CUDALM，不能仅凭 Day 12 复盘通过宣布整个 Bootcamp 完成。

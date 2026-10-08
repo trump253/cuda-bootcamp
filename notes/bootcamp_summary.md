@@ -1,6 +1,6 @@
 # Day 12：CUDA Bootcamp 综合复盘
 
-状态：10 个回答已提交，首轮 Review 完成；第 4–7 题待补充，暂未通过综合复盘。Day 11 基础验收已通过，最终独立 Softmax 验收尚未开始。本任务对应学习计划第 12 节的复盘，不新增 kernel，也不添加新的 CUDA 主题。
+状态：Day 12 综合复盘已通过，第 4–7 题修订已完成复审；最终独立 Softmax 验收尚未开始，整个 Bootcamp 尚未验收完成。本任务对应学习计划第 12 节的复盘，不新增 kernel，也不添加新的 CUDA 主题。
 
 ## 今天的任务与验收
 
@@ -24,19 +24,19 @@
 
 ## 4. warp reduction 是怎么工作的？
 
-回答：同一个warp内各个线程寄存器的变量可以通过广播的方式传递给其他线程，从而实现数据互访的效果，减少对共享内存的访问。
+回答：同一个warp内各个线程寄存器的变量可以通过shuffle的方式传递给其他线程，从而实现数据互访的效果，减少对共享内存的访问。跨warp通过block内可见的共享内存，每个warp规约完成后由lane0写入共享内存，然后进一步规约得到block内的结果。
 
 ## 5. 什么是 memory-bound？
 
-回答：内存瓶颈，运行时间在消耗在了数据搬运上面，DRAM吞吐较高，计算负载较低，在等待数据搬运。典型例子为decode阶段。
+回答：内存瓶颈，运行时间在消耗在了数据搬运上面，可能是因为带宽瓶颈或者访存延迟。
 
 ## 6. 什么是 compute-bound？
 
-回答：计算瓶颈，运行时间消耗在了计算上面，SM吞吐较高，搬运数据要参与很多计算，搬运带宽跑不满。典型场景为Prefill阶段。
+回答：计算瓶颈，运行时间消耗在了计算上面，计算能力限制。
 
 ## 7. 如何 benchmark CUDA kernel？
 
-回答：使用cuda event测量kernel时间，或者使用nsys和ncu辅助测试。
+回答：使用cuda event测量kernel时间，或者使用nsys和ncu辅助测试。首先需要几轮暖机warpup，去掉启动开销对及时的影响，然后在kernel启动紧跟的前和后使用cuda event在和kernel同一个流上记录时间戳，在kernel运行后同步结果，调用kernel的适合循环多次调用取平均值。整个测试过程运行多次确保结果稳定。
 
 ## 8. Nsight Systems 和 Nsight Compute 分别解决什么问题？
 
@@ -52,11 +52,12 @@
 
 ## Review 记录
 
-- 学习者提交：10 个回答已完成；以上保留原始答案，以下是导师反馈，不视为学习者已经自行修正。
+- 学习者提交：10 个回答已完成，第 4–7 题已修订；以上保持本轮原文，以下按轮次记录导师反馈，不代替学习者作答。
 - 首轮 Review：2026-10-08。第 1、8、9 题方向正确；第 2、3、10 题补充表述边界；第 4–7 题需要学习者复述实际过程与判断依据。
-- 当前结论：综合复盘待补充，不进入最终验收、不新增 kernel 或实验。
+- 首轮结论：综合复盘待补充，不进入最终验收、不新增 kernel 或实验。
+- 复审结论：2026-10-08，第 4–7 题修订结合此前已验收的代码与实验，满足本次基础概念复盘要求；Day 12 可以收尾，不再要求重复改写。下一步是计划第 13 节的最终独立 Softmax 验收，尚未开始。
 
-### 逐题反馈
+### 首轮逐题反馈（保留供复习）
 
 | 题号 | 导师反馈 |
 | --- | --- |
@@ -73,13 +74,26 @@
 
 访存计数口径见 [NVIDIA L1/TEX 表说明](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#memory-tables)，shuffle 语义见 [CUDA 11.8 Warp Shuffle](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-c-programming-guide/index.html#warp-shuffle-functions)，计时步骤见 [CUDA 11.8 GPU Timers](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-c-best-practices-guide/index.html#using-cuda-gpu-timers)。瓶颈判断结合 [Nsight Compute 调度与吞吐说明](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#sections-and-rules) 与本仓库 Day 11 的既有结果，不把汇总指标当作因果证明。
 
-### 只需补充的四个回答
+### 首轮要求的四个补充（已提交修订）
 
-可直接在对话中提交，或在本小节追加“修订回答”，不必重写全部十题，也不用新采集：
+以下是首轮要求，保留作对照；本轮已复审，不再作为待办：
 
 1. 第 4 题：结合自己的 Softmax V2，说清五轮 shuffle 如何合并值、哪个 lane 得到结果，以及 8 个 warp 的结果如何合并。
 2. 第 5 题：用 Day 11 的既有结果说明“DRAM 未跑满”为什么不能排除访存限制，当前究竟证明了什么、没证明什么。
 3. 第 6 题：用已有 GEMM 练习说明算术强度/复用与 compute-bound 判断的关系，以及为什么高 SM Throughput 不足以定论。
 4. 第 7 题：不写完整代码，用顺序步骤描述你已经使用过的 Event Benchmark；说明同步对象、平均值算法和计时范围。
 
-以上实际缺口确认后再准备从空源文件开始的最终独立 Softmax 验收框架；最终 kernel、优化与实验仍由学习者完成。
+### 本轮复审与最后提醒
+
+- 第 4 题：已更正为 shuffle 寄存器交换，并补上 warp leader 写 shared 后继续做 block 规约。回答没有展开五轮 delta 与 barrier，但此前 Softmax V2 源码及已验收解释覆盖了这些内容；本轮按“答案 + 已有实践”通过，不把简略表述直接当成完整独立实现的证明。
+- 第 5–6 题：已去掉以高 DRAM/SM 吞吐作为定义的表述，改为带宽/访存延迟限制与计算能力限制，基本定义成立。具体算子的瓶颈仍须结合测量，不仅凭汇总百分比定论。
+- 第 7 题：已补上暖机、同一 stream 的 Event、同步、多次 launch 求平均与多轮稳定性检查；与当前已验收的主机测试流程相符。同步对象和平均值公式的精确写法见下方提醒。
+- 第 2、3、10 题仍保留首轮表述，导师修正也继续保留，不记成学习者本轮已经改写。它们不触发额外算子或实验任务。
+
+最终独立实现时，必须落实以下已学内容，而不是再背一轮问答：
+
+1. warp partial 写入 shared 后，读取前需要 block barrier；行 max/sum 标量写好后，供其他 warp 读取前也要同步。Shuffle 本身不能代替跨 warp 同步。
+2. 暖机排除首次初始化、首次执行和升频等非稳态影响，不会让每次 launch 的稳态成本消失。当前框架用 start 包住整个重复 launch 循环，再记录 stop，执行 `cudaEventSynchronize(stop)` 后取 `elapsed_ms / iterations`；分配、H2D/D2H 与正确性检查放在计时外。Event 区间可能包含设备等后续提交的空隙，不是纯算术耗时。
+3. RMSNorm/fusion 为可选练习。当前唯一尚未完成的必做阶段是从空源文件独立实现 Softmax 的完整验收，不复制旧完整 kernel；本次复盘通过不能替代它。
+
+本次仅 Review 与记录，不创建验收源文件、不修改 CMake、不代跑新实验。最终任务按计划包含 Reference → Naive → Correctness → Benchmark → Profile → 至少两版优化 → Re-benchmark → Notes，最终 kernel、优化与实验仍由学习者完成。

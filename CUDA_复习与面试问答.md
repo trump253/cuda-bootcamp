@@ -109,6 +109,8 @@ Matrix Add 在 `4096 × 4096` 上测得约 555.82 GB/s，对应算法有效带�
 
 短 kernel 容易受启动固定开销、GPU P-state 和升频过程影响。Reduction V0 的首次测试中，小尺寸前两轮比暖机后慢约 32%；丢弃一次整程序暖机后，大尺寸三轮极差降到 0.04% 以下。因此性能结论应使用相同条件下的多轮稳定结果。
 
+Day 12 复审提醒：暖机用于排除首次初始化/执行及升频等非稳态影响，不代表之后每次 launch 没有成本。当前 [Softmax Benchmark 框架](07_softmax/softmax_harness.h) 在计时区间仍逐次调用 launch；若 GPU 等待主机提交下一次工作，Event 区间也可能包含这段空隙。当前测量方式是同一 stream 上 start → 重复 launch → stop，同步 stop 后取 `elapsed_ms / iterations`，不是每轮都在中间插入设备同步；分配、H2D/D2H 与正确性检查置于计时外。Event 的记录与同步语义见 [CUDA 11.8 GPU Timers](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-c-best-practices-guide/index.html#using-cuda-gpu-timers)。
+
 ## 4. Global Memory、Coalescing 与 Sector
 
 ### 什么是合并访存？

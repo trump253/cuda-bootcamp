@@ -494,3 +494,7 @@ Xvfb 只提供容器内的虚拟屏幕，想在本地看到它还需 VNC/noVNC �
 ### 关闭 Nsight Systems 窗口后，noVNC 只显示黑色桌面，说明连接失败了吗？
 
 不一定。Xvfb 虚拟屏幕、VNC/noVNC 连接和 `nsys-ui` 是不同的进程；GUI 程序退出后，连接仍可保持，浏览器看到的是没有程序窗口的桌面。在容器终端指定原来的 `DISPLAY=:99` 和渲染环境，再运行 `nsys-ui` 打开报告即可，命令见 [容器内 GUI 指南](08_nsys/GUI.md)。只关闭浏览器标签页时，服务器上的 GUI 继续运行，重新访问网页即可。
+
+### `build/nsys-gui/` 被 Git 忽略，是否可以随时删除并只重新运行 `nsys-ui`？
+
+这个目录可以重建，但运行 noVNC 时需要其中的网页、脚本、翻译和配置。Git 忽略生成文件，不代表运行时不依赖它们。`mkdir -p` 只创建空目录，`nsys-ui` 只启动 GUI；整目录清理后还需用 `08_nsys/configure_novnc.py` 重建网页资源并恢复连接服务。当前 websockify 将 `web/` 作为工作目录，在运行中删除它后，即使重建同名路径也需要重启 websockify。清理与恢复顺序见 [容器内 GUI 指南](08_nsys/GUI.md)。

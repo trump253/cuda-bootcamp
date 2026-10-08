@@ -117,6 +117,8 @@ ncu --import build/day11_softmax_v1.ncu-rep --page raw
 
 注意：两个 section 都可能显示 `Memory Throughput`，必须带 section 名与单位区分。L1/TEX sector 不等于 DRAM 读取次数或流量；`sector/request` 在标量与 float4 之间不能简单按“越低越好”排名。
 
+本机 2022.3 的 raw 输出将上述 stall ratio 的单位显示为 `inst`，但 section 图轴定义为 `Cycles per Instruction`；记录时按该语义理解，不要误写成百分比。它与先前 Reduction 使用的 `per_warp_active.pct` 不是同一口径。
+
 ## 5. 你要回答的问题
 
 1. 同轮 Event 中 V2 比 V1、V3 比 V2 分别快多少？三轮波动是否足以影响判断？ncu 的排序是否一致？

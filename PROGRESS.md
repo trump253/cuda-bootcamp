@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 11 — Nsight Compute 对照任务与分析模板已准备，等待学习者采集 Softmax V1/V2/V3 并解释结果；Day 10 已验收，最终独立 Softmax 验收尚未进行
+Day 11 — 学习者已完成 Softmax V1/V2/V3 三轮 Event 与 ncu 采集，数据统计和报告复核完成；等待学习者解释六个问题与瓶颈，最终独立 Softmax 验收尚未进行
 
 ## 已完成
 
@@ -593,18 +593,24 @@ Day 11 — Nsight Compute 对照任务与分析模板已准备，等待学习者
 - CMake 默认构建切换为 Softmax V1/V2/V3，Day 10 的 Vector Add 与 Reduction V3 已恢复为可重新启用的注释目标；未修改已完成的 kernel。
 - 已确认本机 ncu 2022.3.0 可识别四个 section 与采集参数，构建配置保留现有 Debug / sm_75。
 - 三个 target 已编译成功；每版 19 组正确性测试均 PASS，共 57 组，退出码为 0。任务文档中的 Bash 命令通过语法检查；两份旧笔记去除空白后与原文完全一致，确认仅改排版。新的 Benchmark/Profile 尚未代跑。
+- 2026-10-08：学习者已提交三轮交替运行的 Softmax V1/V2/V3 输出，共 171 条正确性 PASS，以及相同 `(128,4096)`、grid=128、block=256 的三份 ncu 报告，各 14 passes。导师只导入已有报告复核，未重跑实验或改 kernel。
+- `(128,4096)` 三轮 Event 平均为 V1 0.007478333 ms、V2 0.006805333 ms、V3 0.006858667 ms；V2 相对 V1 加速 1.098893×，V3 相对 V2 平均慢约 0.78%。ncu Duration 为 11.07/10.24/10.40 µs，排序相同。
+- 已把三轮 Event、其他形状平均值、吞吐、occupancy、stall 与访存计数填入 `09_ncu/NOTES.md`。V3 在 `(16,512)` 平均快约 5.51%，说明趋势依形状而异；未替学习者完成六个回答与瓶颈分析。
+- ncu 直接证据：V1 → V2 的 shared-load/store 指令分别下降 93.38%/87.50%；V2 → V3 的 global-load request 下降 75%，总 sector 不变。V3 每线程寄存器更多，但 theoretical occupancy 仍是 100%，不能将轻微回退直接归因于 occupancy 下降。
 
 ## 当前问题
 
 - Day 10 未将亚微秒 gap 的内部成因与 GPU 纯计算占比独立分解；
   不影响本节定位时间线与区分证据/推断的验收。
-- Day 11 框架已准备，但新的同轮 Benchmark/Profile、瓶颈判断与最终独立 Softmax 验收尚未完成；不得把准备框架记成实验通过。
+- Day 11 新的同轮 Benchmark/Profile 与数据复核已完成，但六个回答和瓶颈解释尚未提交，暂不验收；采集时同卡其他任务及各次程序退出码未在日志中单列。最终独立 Softmax 验收仍未进行。
 
 ## 今日关键知识
 
 - Day 11 从单 kernel 内部分析 Duration、Memory/DRAM/Compute Throughput、Occupancy 与 Warp Stall；不再把 CPU launch 时长混入 GPU Duration。
 - 同名 Memory Throughput 需区分 section 与单位；SM 吞吐百分比不等于 FLOP/s，occupancy 也不是全卡 SM 利用率或性能得分。
 - 本机 WarpStateStats 的 stall 图使用 cycles/instruction，不是 kernel 耗时百分比；ncu replay 的时钟与缓存条件不同于暖机后的 Event，二者不可混用计算加速比。
+- stall 的 `per_issue_active.ratio` 是按发出指令归一化的比值，不能与此前 Reduction 的 `per_warp_active.pct` 混用；比值升降不能直接证明绝对等待周期或同步耗时同比变化。
+- 性能百分比不是评分：本轮更快的 V2，SM Throughput 与 achieved occupancy 都比 V1 略低；V3 request 更少、occupancy 略高，却未在主要形状继续加速。
 - `float4` 每组覆盖四个相邻 FP32 元素；必须检查行首实际地址的
   16 字节对齐，尾部不足四个元素不能直接用完整 `float4` 读取。
 - 某行是否对齐还取决于 `row`：基址对齐时条件为
@@ -665,5 +671,5 @@ Day 11 — Nsight Compute 对照任务与分析模板已准备，等待学习者
 
 ## 下一任务
 
-- 学习者按 `09_ncu/README.md` 复查三版正确性，测三轮 Event，并采集相同 `(128,4096)`、grid=128、block=256 的三份 ncu 报告。
-- 填写 `09_ncu/NOTES.md`，回答六个问题，提交原始输出与解释供 Review；暂不改 kernel 或添加其他课程任务。
+- 学习者基于已经整理的 `09_ncu/NOTES.md` 回答任务 README 的六个问题，填写 V1/V2/V3 源码解释、瓶颈判断与 V3 为什么赢或输。
+- 先解释现有证据，不必立即改 kernel 或扩展实验；提交回答后再 Review，Day 11 通过后才评估下一任务。

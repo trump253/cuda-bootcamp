@@ -522,3 +522,9 @@ API Duration 是 `CPU API 返回 − CPU API 开始`；GPU Duration 是 `GPU 工
 ### 17 个 block 和 1 个 block 都只运行约 2.8 µs，说明什么？
 
 block 可以分布到多个 SM 并行，kernel Duration 不要求随 block 数量线性增长；这两个小 grid 的每 block 规约流程也相近。本次后两轮 CPU launch 为 8.824/6.211 µs，GPU Duration 为 2.879/2.816 µs，支持“主机提交成本相对显著”。GPU Duration 记录设备执行，不能说里面基本都是 CPU 提交；其中仍包含访存、规约、同步与采集影响，当前数据不足以分离纯算术占比。主机提交还会与前一轮 GPU 工作重叠，不能将 CPU/GPU 各段相加或仅凭这些比值断言整个流程只受 launch 限制。来源：[CUDA 11.8 block 调度说明](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-c-programming-guide/index.html#hardware-implementation)。
+
+## 11. Nsight Compute 单 kernel 分析
+
+### Day 11 的 barrier stall 值 1.34 是 1.34% 吗？能直接与此前 Reduction 的 stall 百分比比较吗？
+
+不是。Day 11 采集的是 `smsp__average_warps_issue_stalled_barrier_per_issue_active.ratio`；本机 raw 输出把单位显示为 `inst`，但 `WarpStateStats` section 的图轴为 `Cycles per Instruction`，语义是按发出指令数归一化的 warp 等待周期比值。此前 Reduction 使用 `per_warp_active.pct`，分母与单位不同，不能混用。V2/V3 的 barrier ratio 为 1.10/1.83，即使源码都只有 4 次 block barrier，也不能根据该比值断言 barrier 数量、绝对等待周期或总同步耗时同比增加；指令数变化与到达 barrier 的时序都可能影响结果，具体原因还需证据。来源：[NVIDIA WarpStateStats 说明](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#sections-and-rules)。

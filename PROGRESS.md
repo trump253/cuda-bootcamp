@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 12 综合复盘 — Day 11 基础验收通过，已准备计划中的 10 个复盘问题；最终独立 Softmax 验收尚未开始
+Day 12 综合复盘 — 10 个回答已提交，首轮 Review 完成，第 4–7 题待补充；最终独立 Softmax 验收尚未开始
 
 ## 已完成
 
@@ -608,16 +608,23 @@ Day 12 综合复盘 — Day 11 基础验收通过，已准备计划中的 10 个
 - 2026-10-08：学习者已提交三段收尾分析，正确解释 V1 → V2 平均延迟降低约 9%、shared/barrier 同时减少且无法分离收益，以及本轮四个形状中仅 `(16,512)` 的 V3 平均延迟降低。已正确修正等待 warp 仍驻留、计入 occupancy，缺少就绪 warp 会影响发出指令。
 - 导师将“瓶颈都在全局内存访问”修正为“优先调查访存结果依赖与延迟隐藏，现有汇总未证明唯一瓶颈”，保留学习者原始判断与导师修正的区别。已把答复、数据与源码核对整理进 Day 11 的五个分析小节，基础验收通过；不要求继续深挖具体因果定位。
 - 已创建 `notes/bootcamp_summary.md`，只包含计划中的 10 个已遇到的复盘问题和空回答区；未填答案、改 kernel、改 CMake 或新采集。复盘后再准备最终独立 Softmax 验收，RMSNorm/fusion 不自动新增为必做内容。
+- 2026-10-08：学习者已填写全部 10 个复盘回答；导师保留原始答案并完成逐题反馈。SIMT、两种 Nsight 工具的分工与等待 warp 仍计入 occupancy 的方向正确；规约合并过程、访存/计算限制的判断与 Event 测量流程仍需复述。
+- 已将复盘补充范围收敛到第 4–7 题，接受直接在对话中提交，不重写全部十题、不新采集。已明确 4 sector 的访问宽度/对齐条件、shared 的共享范围与容量口径，以及 RMSNorm/fusion 不属于额外毕业条件；未修改源码或创建最终验收 kernel。
 
 ## 当前问题
 
 - Day 10 未将亚微秒 gap 的内部成因与 GPU 纯计算占比独立分解；
   不影响本节定位时间线与区分证据/推断的验收。
 - Day 11 基础验收已通过，但未证明唯一瓶颈、同步贡献和 V3 回退的精确原因；这些不是本节必须追加实验的目标。采集时同卡其他任务及各次程序退出码未在日志中单列，限制结果的推广，不将其写成跨环境保证。
-- 学习者对瓶颈的绝对表述已由导师修正，性能观测与原因推断的区分继续在 Day 12 复盘中巩固；10 个复盘回答待提交，最终独立 Softmax 验收尚未开始。
+- Day 12 已提交全部十题，但第 4 题未解释树形规约过程，第 5–6 题仍以吞吐表象定义瓶颈，第 7 题缺少具体测量流程；待学习者补充这四题后再判断复盘是否通过。最终独立 Softmax 验收尚未开始。
 
 ## 今日关键知识
 
+- Shuffle 寄存器交换不等于广播；当前 down-shuffle 按 16、8、4、2、1 逐轮合并，lane 0 使用 warp 的最终 sum/max，再通过 shared 与 block barrier 做跨 warp 交接。
+- 4 sector 是 32 个活跃 lane 各读取连续且按 sector 对齐的 4 字节值的特例；每 lane 连续读一个 16 字节 float4 时，16 sector 仍可完全合并。缓存层 sector 不直接等于 DRAM 字节数。
+- memory-bound 不要求 DRAM 带宽跑满，访存延迟与延迟隐藏也可能限制性能；compute-bound 不能只凭高 SM Throughput、低 DRAM 推定。需要结合当前 workload、相关管线/等待与对照测量。
+- Benchmark 要描述测量流程，而非只报工具名：计时外分配/复制与暖机，同一 stream 上 start/重复 launch/stop，同步 stop 后按 iterations 求平均，固定环境并比较多轮结果。
+- RMSNorm/fusion 是计划中的可选补缺；当前必做剩余工作是复盘缺口与最终独立 Softmax 性能闭环，不增加新的算子门槛。
 - Day 11 从单 kernel 内部分析 Duration、Memory/DRAM/Compute Throughput、Occupancy 与 Warp Stall；不再把 CPU launch 时长混入 GPU Duration。
 - 同名 Memory Throughput 需区分 section 与单位；SM 吞吐百分比不等于 FLOP/s，occupancy 也不是全卡 SM 利用率或性能得分。
 - 本机 WarpStateStats 的 stall 图使用 cycles/instruction，不是 kernel 耗时百分比；ncu replay 的时钟与缓存条件不同于暖机后的 Event，二者不可混用计算加速比。
@@ -689,6 +696,6 @@ Day 12 综合复盘 — Day 11 基础验收通过，已准备计划中的 10 个
 
 ## 下一任务
 
-- 学习者填写 `notes/bootcamp_summary.md` 的 10 个复盘问题，每题约 2–4 句话；涉及实现或性能时结合已有练习或实验，可直接在对话中提交，不要求背长指标名。
-- 导师只针对复盘暴露的实际缺口补讲，重点核对访存/计算限制、性能证据边界与 occupancy，不新增 CUDA 主题或默认重跑实验。
+- 学习者只补充 `notes/bootcamp_summary.md` 第 4–7 题：结合 Softmax V2 描述两级规约，用已有 Day 11/GEMM 数据区分瓶颈假设与证据，并按顺序描述 Event Benchmark。可直接在对话中提交，不要求背长指标名或重写全部十题。
+- 导师核对这些实际缺口后再判断复盘是否通过；第 2、3、10 题的表述边界已记录供复习，不额外增加实验或 CUDA 主题。
 - 复盘 Review 通过后，准备从空源文件开始的最终独立 Softmax 验收；保留 Reference → Naive → Correctness → Benchmark → Profile → 两版优化 → Re-benchmark → Notes 闭环，不复制旧 kernel。RMSNorm/fusion 为可选补缺，不自动追加。

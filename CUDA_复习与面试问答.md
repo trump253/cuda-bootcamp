@@ -71,6 +71,8 @@ kernel-only latency 与端到端 latency 是不同指标。前者只衡量 GPU k
 
 CUDA Event 被记录在 GPU stream 的执行序列中，可以测量 start 与 stop 之间的 GPU 工作。当前流程在计时前 warm-up，在计时区外完成分配和复制，并对多次 kernel 的总时间取平均。
 
+Day 12 复盘提醒：仅写“使用 Event/ncu”还不是完整 Benchmark 流程。当前 kernel-only 测量先通过正确性与 CUDA 错误检查，在计时外完成分配、H2D 与暖机；同一 stream 上记录 start，重复 launch，再记录 stop；同步 stop 后取 `elapsed_ms / iterations`。固定 GPU、shape、编译配置和重复次数，至少三轮并报告平均延迟与波动。Profiler/Sanitizer 下的时间与普通 Event 基线分开记录；Event 区间也可能含 GPU 等待后续提交的空隙，不能当作纯算术耗时。Event 语义来源：[CUDA 11.8 GPU Timers](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-c-best-practices-guide/index.html#using-cuda-gpu-timers)。
+
 ### 有效带宽是什么？
 
 ```text
@@ -116,6 +118,10 @@ Matrix Add 在 `4096 × 4096` 上测得约 555.82 GB/s，对应算法有效带�
 ### Sector 是什么？
 
 在当前 global-memory 分析中，sector 可以理解为 cache line 内更小的传输/请求单位，常以 32 bytes 分析。一个线程只读取 4-byte `float` 时，仍可能占用一个 sector；相邻线程访问连续 `float` 可以共同利用较少 sector。
+
+### 合并访存一定是每 request 4 个 sector 吗？
+
+不是。4 个 sector 的例子要求同一 warp 的 32 个活跃 lane 各读取一个 4 字节 FP32，地址连续，起点按 32 字节对齐，共覆盖 128 字节。当前 Softmax V3 的 float4 则每 lane 读取 16 字节，整 warp 连续覆盖 512 字节，对应 16 个 sector，仍是合并访问。要同时看活跃 lane、访问宽度、地址分布与对齐，不能把 16 sector/request 单独判成不合并；L1/TEX sector 也不是直接发生在 DRAM 的流量。来源：[NVIDIA L1/TEX 计数口径](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#memory-tables)。
 
 ### Naive Transpose 为什么慢？
 
@@ -202,6 +208,8 @@ Profile 证明的实际差异是：V2 的 warp instructions 从 129,302,528 降�
 ### `__shfl_down_sync` 如何完成当前的 warp reduction？
 
 同一 warp 的 lane 可以直接读取更高 lane 的寄存器值，delta 按 16、8、4、2、1 递减并逐轮相加，最终 lane 0 得到 warp sum。Shuffle 不能跨 warp，因此一个 256-thread block 仍需让 8 个 warp leader 把 partial sum 写入 shared memory，经过一次 `__syncthreads()` 后，再由 warp 0 做第二级归约。
+
+Day 12 复盘提醒：寄存器交换不能一概叫作广播。广播让多个 lane 读取同一个源 lane；`__shfl_down_sync` 的源则是各自的 `lane + delta`，各 lane 拿到的值可能不同。Shuffle 只交换值，后面的加法或 max 才完成本轮合并；不是调用一次就自动得到整个 warp 的规约结果。来源：[CUDA 11.8 Warp Shuffle](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-c-programming-guide/index.html#warp-shuffle-functions)。
 
 ### Full mask 是否会让无效或已退出的 lane 参与执行？
 
@@ -578,3 +586,17 @@ Day 11 收尾时学习者提出“瓶颈都在全局内存访问”，该表述�
 | 3 | 数据返回，依赖计算就绪 | 仍保持自身执行状态 | 可再次选择 warp 0 发出计算指令 |
 
 隐藏延迟不是让 warp 0 的读取更快，而是用其他 warp 的工作覆盖它的等待，减少执行单元空闲。若 scheduler 管理的所有驻留 warp 都没有下一条可发出的指令，就仍可能空闲；因此高 occupancy 不保证延迟已被隐藏。这里不释放驻留资源，等待 warp 仍计入 occupancy。来源：[NVIDIA 驻留与就绪状态说明](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#hardware-model)。
+
+## 12. 综合复盘中的概念边界
+
+### memory-bound 一定要求 DRAM 吞吐高？compute-bound 只看 SM Throughput 高就够吗？
+
+都不是。memory-bound 表示性能主要受内存子系统限制，要区分带宽限制与访存延迟/延迟隐藏限制；后一种情况下 DRAM 带宽可能没跑满。compute-bound 表示计算执行能力成为主要限制，SM Throughput 是汇总值，不能直接代替某条算术管线的利用率。本次 Day 11 的约 35% DRAM 吞吐与较大 long scoreboard 支持优先调查访存依赖，但尚未证明唯一瓶颈；Naive/Tiled GEMM 的复用、吞吐和延迟对照也不能仅凭高 SM、低 DRAM 宣布 compute-bound。先描述当前工作与证据，再说明尚未定位的原因。来源：[NVIDIA 调度、吞吐与 Profile 说明](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#sections-and-rules)。
+
+### shared 一定比 register 容量大吗？
+
+不能脱离统计范围比较。register 保存线程私有状态，但硬件寄存器文件是 SM 上的资源；shared 是 block 内共享、由 SM 的 shared 资源分配的空间。比较单线程寄存器、一个 block 的 shared 或整个 SM 的资源，口径不同。当前重点是作用域和用途：global 放大规模输入输出，register 放私有中间值，shared 放 tile/warp partial 并配合必要同步，不背固定的容量大小排序。
+
+### 进入 CUDALM 前必须再补 RMSNorm 和 fusion 吗？
+
+不是。[学习计划第 12 节](CUDA_Bootcamp_Learning_Plan.md) 将它们作为前面进度快时的可选综合练习。当前需要补齐实际复盘缺口，再完成第 13 节从空文件独立实现 Softmax 的正确性、Benchmark、至少两版优化、Profile 与 Notes；最终验收通过后进入 CUDALM，不为了“所有算子都学过”继续扩展 Bootcamp。

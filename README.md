@@ -95,7 +95,7 @@ cuda-bootcamp/
 - Day 10 Nsight Systems：三份时间线、传输与同步定位、依赖顺序和
   短 kernel 提交开销分析已完成 Review，验收通过。
 - Day 11 Nsight Compute：三轮对照、Profile、收尾分析与基本调度解释已完成 Review，基础验收通过；绝对瓶颈表述已由导师收紧。
-- Day 12 综合复盘：已准备计划中的 10 个复盘问题，待学习者回答。
+- Day 12 综合复盘：10 个回答已提交并完成首轮 Review；第 4–7 题待补充，最终独立验收尚未开始。
 
 当前任务是 [Day 12 综合复盘](notes/bootcamp_summary.md)。Day 11 数据与 Review 保留在 [分析笔记](09_ncu/NOTES.md)，Bootcamp 最终独立 Softmax 验收尚未开始。
 详细进度见 `PROGRESS.md`。

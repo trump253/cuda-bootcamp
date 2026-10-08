@@ -75,13 +75,14 @@ def main():
     elif link.exists():
         raise SystemExit(f"网页资源入口已被其他文件占用：{link}")
     link.symlink_to(Path("..") / target.name, target_is_directory=True)
-    # 根地址直接显示桌面，页面内的相对资源仍从版本目录加载。
+    # 桌面入口的相对资源仍从版本目录加载。
     page = (target / "vnc.html").read_text()
     if page.count("<head>") != 1:
         raise SystemExit("noVNC 网页结构与预期不符，请检查固定版本。")
     entry = page.replace("<head>", f'<head>\n    <base href="./{target.name}/">', 1)
-    for name in ["index.html", "vnc.html"]:
-        (web / name).write_text(entry)
+    (web / "vnc.html").write_text(entry)
+    # 保留服务器的目录首页，由学习者点击 vnc.html 进入桌面。
+    (web / "index.html").unlink(missing_ok=True)
     print(f"noVNC {VERSION} 简体中文资源已准备：{target}")
     print(f"websockify 网页根目录：{web}")
 

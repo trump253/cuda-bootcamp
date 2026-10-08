@@ -92,7 +92,7 @@ cuda-bootcamp/
   向量化未获得所有形状上一致的性能收益。
 - Day 10 Nsight Systems：三份时间线、传输与同步定位、依赖顺序和
   短 kernel 提交开销分析已完成 Review，验收通过。
-- Day 11 Nsight Compute：三轮 Event 与三份 Profile 已由学习者采集，数据已整理；六个问题与瓶颈解释待学习者完成。
+- Day 11 Nsight Compute：采集、统计与前五个回答已初步 Review；等待学习者完成 warp stall 理解检查与瓶颈解释。
 
 当前任务是 [Day 11 Nsight Compute 单 kernel 分析](09_ncu/README.md)，填写 [分析笔记](09_ncu/NOTES.md)。Day 10 已验收，Bootcamp 最终独立 Softmax 验收尚未完成。
 详细进度见 `PROGRESS.md`。

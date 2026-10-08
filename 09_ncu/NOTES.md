@@ -1,6 +1,6 @@
 # Softmax Nsight Compute 分析笔记
 
-状态：学习者已于 2026-10-08 提交三轮 Event 和三份 ncu 输出；导师已完成统计，并通过导入本地报告核对关键指标，没有重新采集。下面记录实测数据，源码解释、瓶颈判断与六个问题仍由学习者填写。命令与指标解释见 [Day 11 任务](README.md)。
+状态：学习者已于 2026-10-08 提交三轮 Event、三份 ncu 输出和前五个问题的初步回答；导师已完成统计与答复 Review，并补充 warp stall 的最少理论。下面记录实测数据和 Review，最终瓶颈解释与 stall 理解检查仍待学习者完成。仅导入已有报告，没有重新采集或修改 kernel。命令与指标解释见 [Day 11 任务](README.md)。
 
 ## 实验环境与正确性
 
@@ -25,7 +25,7 @@
 
 - V2 相对 V1 加速比（V1 / V2）：1.098893×，平均延迟降低约 9.00%。
 - V3 相对 V2 加速比（V2 / V3）：0.992224×，平均延迟增加约 0.78%，绝对差约 0.053 µs；本轮三次配对均稍慢。
-- 差异是否明显大于本轮波动：待学习者解释。三次测量可描述本轮趋势，但不足以给出跨环境的统计保证。
+- 学习者结论：向量化不一定带来稳定收益。Review：正确；补充本轮主要形状三次都稍慢，不能直接说差异全是噪声，也不能凭三次测量推广到所有环境。其他形状已有正收益，结论需限定形状与测量条件。
 
 其他形状的三轮平均值：
 
@@ -69,6 +69,10 @@
 | 寄存器容量允许的驻留 block 上限 | 5 block/SM | 5 block/SM | 4 block/SM |
 | warp 容量允许的驻留 block 上限 | 4 block/SM | 4 block/SM | 4 block/SM |
 | Waves Per SM | 0.47 wave | 0.47 wave | 0.47 wave |
+| 活跃周期内平均驻留 warp 数 | 14.00 warp/SM | 13.90 warp/SM | 14.21 warp/SM |
+| Issue Active（per_cycle_active，比值） | 0.24 | 0.24 | 0.22 |
+
+后两行来自本次已有报告的 `sm__warps_active.avg.per_cycle_active` 与 `smsp__issue_active.avg.per_cycle_active`，未新增采集。Issue Active 的值折合约 24%/24%/22%，描述对应活跃周期内 scheduler 发出指令的周期比例，不是全 GPU 的繁忙时间比例。
 
 数据核对结论，不替代下面的学习者解释：
 
@@ -113,11 +117,34 @@
 
 按任务 README 第 5 节逐项作答；可引用上面的分析，不用重复抄写完整段落。
 
-1. 待填写。
-2. 待填写。
-3. 待填写。
-4. 待填写。
-5. 待填写。
-6. 待填写。
+1. 学习者：“向量化不一定会带来稳定的收益。”Review：方向正确；需结合三轮波动限定结论，区分主要形状的轻微回退和其他形状的收益。
+2. 学习者：“shared-load/store 次数大幅下降支持收益；barrier 变化不大是否证明同步影响不大？”Review：前半正确，但指标精确地说是 warp 级 shared 访存指令数；配合 Event 变快支持优化，而非仅靠计数下降证明速度。后半不能成立：本次 barrier 是按发出指令归一化的比值，不是同步耗时。源码中 V1 有 `2×(1+8)=18` 个 block barrier 阶段，V2 有 4 个；shared 与 barrier 同时改变，现有对照没有独立分离二者的收益贡献。
+3. 学习者：“每个 warp 从 FP32 变成 float4，sector/request 从 4 变成 16，request 降为四分之一，总数不变。”Review：正确；更精确地说是每个 lane 一条加载从 4 字节变成 16 字节，满 warp 覆盖量从 128 字节变为 512 字节。本次 `49152×4=12288×16=196608 sector`，这是 L1/TEX 请求覆盖量，不是 DRAM 总流量。
+4. 学习者：“不能只看 DRAM；还有同步等开销。”Review：正确；再区分访存带宽限制与访存延迟/依赖等待。带宽未满也可能在等数据，不能反过来直接断言 compute-bound。
+5. 学习者：“实际利用率约 44%，可能因为任务短、并行程度不够。”Review：方向正确，但这个数是驻留 warp 占 SM 容量的比例，不是全卡利用率；等待数据或 barrier 的驻留 warp 也计入 occupancy。本卡 68 个 SM、每 SM 最多 32 个 warp，每 block 8 个 warp，理论容量允许 4 block/SM；填满这些容量需 272 个 block，本轮只有 128 个。`Waves Per SM=0.47` 支持工作量不足一整波的解释；短 kernel 的起止阶段还可能影响平均值，但“运行时间短”本身不必然导致低 occupancy。
+6. 学习者询问：“stall 具体是什么，要结合哪些参数分析？”导师讲解：见下面的方法与 [复习问答](../CUDA_复习与面试问答.md#11-nsight-compute-单-kernel-分析)。本题尚未由学习者独立解释本轮瓶颈，不标记通过。
 
-Review：采集与数据统计检查已完成；学习者的六个回答、源码解释与瓶颈判断尚未提交，Day 11 暂不标记验收通过。最终独立 Softmax 验收仍未进行。
+## Warp stall 的最少分析方法
+
+stall 是某个 warp 的下一条指令暂时不能发出，例如要用的数据尚未返回、还没等齐 block 同伴或目标执行管线暂时不能接收指令。该 warp 等待时，scheduler 可以给其他就绪 warp 发出指令；因此一个 warp 等待不等于整张 GPU 停住，也不等于其不再计入 occupancy。
+
+| 原因 | 先理解为 | 本节配合查看 |
+| --- | --- | --- |
+| Long Scoreboard | 等 L1/TEX 路径上的访存结果依赖，不一定等于 DRAM miss | global request/sector、L1/L2 hit rate、DRAM 吞吐、驻留 warp 与 Issue Active |
+| Short Scoreboard | 等 shared 等非 L1/TEX 操作的结果依赖，不一定是 bank conflict | shared-load/store 指令、相关依赖；若判断 bank conflict，要有专门计数器证据 |
+| Barrier | 已到 block 同步点，等同 block 其他 warp | barrier 所在位置与执行阶段数、同步前工作分配，而非只数函数调用 |
+| Wait | 等固定延迟执行依赖 | 源码的数据依赖和 Issue Active，不能把它全部归到 expf |
+| Math Pipe Throttle | 所需数学执行管线暂时不能接收指令 | 相关管线吞吐与指令混合，而非只看 SM 汇总百分比 |
+
+定义参考 [NVIDIA warp 调度与等待原因](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#warp-stall-reasons)。本阶段只理解这些调查方向，不展开底层指令研究。
+
+先确认 Event/Duration 的快慢，再找主要等待原因，接着看 scheduler 是否真的缺少发指令的机会，最后用相关访存、吞吐、occupancy 指标和源码交叉解释。本轮 long scoreboard 为 6.16/6.57/8.24 cycles/instruction，在主要等待项中最大；Issue Active 约为 24%/24%/22%，说明值得调查未被隐藏的依赖等待。源码中 max、指数和与输出阶段都读取 input，后续 fmaxf/expf 依赖所读值，这是一个合理调查方向，但当前汇总没有定位哪次读取贡献最大，也不能据此宣布唯一瓶颈。
+
+这些比值不是 kernel 总耗时百分比，不应相加成耗时分解；高 stall 也不自动等于优化它就一定加速。先区分“GPU 在等数据”与“DRAM 带宽已经用满”，不必立即追加复杂实验。
+
+## 待学习者补充的两个理解检查
+
+1. 某个 warp 因输入数据尚未返回而等待时，其他 warp 能否继续执行？等待中的 warp 是否仍计入 occupancy？
+2. 本轮 long scoreboard 较大，但 DRAM 吞吐约 35%、Issue Active 约 22%–24%：应优先调查哪类限制？为何还不能认定它是唯一瓶颈？同时更正“barrier 比值变化不大，所以同步没影响”的结论。
+
+Review：采集、统计与前五个回答的初步 Review 已完成；同步贡献推断与 occupancy 用语已指出需修正。等待学习者完成上述两个理解检查并形成自己的瓶颈解释，Day 11 暂不标记验收通过。最终独立 Softmax 验收仍未进行。

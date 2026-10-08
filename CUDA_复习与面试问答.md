@@ -528,3 +528,25 @@ block 可以分布到多个 SM 并行，kernel Duration 不要求随 block 数�
 ### Day 11 的 barrier stall 值 1.34 是 1.34% 吗？能直接与此前 Reduction 的 stall 百分比比较吗？
 
 不是。Day 11 采集的是 `smsp__average_warps_issue_stalled_barrier_per_issue_active.ratio`；本机 raw 输出把单位显示为 `inst`，但 `WarpStateStats` section 的图轴为 `Cycles per Instruction`，语义是按发出指令数归一化的 warp 等待周期比值。此前 Reduction 使用 `per_warp_active.pct`，分母与单位不同，不能混用。V2/V3 的 barrier ratio 为 1.10/1.83，即使源码都只有 4 次 block barrier，也不能根据该比值断言 barrier 数量、绝对等待周期或总同步耗时同比增加；指令数变化与到达 barrier 的时序都可能影响结果，具体原因还需证据。来源：[NVIDIA WarpStateStats 说明](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#sections-and-rules)。
+
+V1/V2 的 shared-load/store 指令数明显下降，配合 Event 变快支持优化假设，但不能据 barrier ratio 的变化幅度说同步影响很小。源码中 V1 的 max/sum 各有 1 次初始同步与 8 次 tree 同步，共 18 个阶段；V2 共 4 个。两种成本同时改变，当前对照没有独立分离 shared 访问与同步的收益贡献。
+
+### warp stall 是什么？是不是整个 GPU 暂停，或者这个 warp 不再计入 occupancy？
+
+stall 是某个 warp 的下一条指令暂时不能发出。比如读 input 后立即用它求 max，如果所需数据还没返回，该 warp 必须等待依赖满足；其他就绪 warp 仍可能被 scheduler 选中执行，从而隐藏等待延迟。等待数据或 block barrier 的驻留 warp 仍计入 occupancy，所以 occupancy 高不等于这些 warp 都已就绪，也不等于每周期都能发出指令。报告里的 selected/not selected 是调度状态，不能一概理解为真正的依赖等待。来源：[NVIDIA 调度与 warp 状态说明](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#sections-and-rules)。
+
+### 本节的五类 stall 要怎么读，结合什么分析？
+
+| 等待原因 | 最少解释 | 配合的证据 |
+| --- | --- | --- |
+| Long Scoreboard | 等 L1/TEX 路径上的访存结果依赖，不一定是 DRAM miss | global request/sector、cache hit rate、DRAM 吞吐、occupancy 与 Issue Active |
+| Short Scoreboard | 等 shared 等非 L1/TEX 操作的依赖，不一定是 bank conflict | shared-load/store、源码依赖；bank conflict 需另有对应计数器 |
+| Barrier | 到达 block 同步点后等同 block 其他 warp | 同步位置、执行阶段数与前置工作分配 |
+| Wait | 等固定延迟执行依赖 | 源码数据依赖与指令发出活跃度，不能全归到 expf |
+| Math Pipe Throttle | 所需数学执行管线暂时不能接收指令 | 相关管线吞吐与指令混合 |
+
+本阶段先确认 Event/Duration 的快慢，再看主要等待原因、Issue Active、相关吞吐/访存计数与源码。Day 11 三版 long scoreboard 为 6.16/6.57/8.24 cycles/instruction、DRAM 吞吐约 33%–36%、Issue Active 约 24%/24%/22%；值得调查访存依赖等待与延迟隐藏，不能把“带宽未满”翻译成“访存没有限制”，也不能仅凭最大 stall 宣布唯一瓶颈。这些等待统计可来自同时驻留的不同 warp，不能相加成整个 kernel 的耗时分解。来源：[NVIDIA 等待原因定义](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#warp-stall-reasons)。
+
+### theoretical occupancy 为 100%，achieved 约 44%，为什么不能说 GPU 利用率只有 44%？
+
+它描述驻留 warp 相对 SM 容量的比例，不是全卡繁忙时间比例。当前报告平均为约 14 warp/SM，而 Turing 的上限是 32 warp/SM，约为 44%。本卡 68 个 SM、256 thread/block 即 8 warp/block；理论容量允许 4 block/SM，填满这批容量需要 272 个 block，但本轮只有 128 个，`Waves Per SM=0.47`，支持工作量不足一整波的解释。起止阶段和工作分布还影响实际平均值，不能把 `128/272` 当作 achieved occupancy 的精确公式，更不能仅因 kernel 短就断言 occupancy 必然低。来源：[NVIDIA Turing 调度与 occupancy 说明](https://docs.nvidia.com/cuda/archive/11.8.0/turing-tuning-guide/index.html#occupancy)。

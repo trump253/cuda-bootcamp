@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 11 — 学习者已完成 Softmax V1/V2/V3 三轮 Event 与 ncu 采集，数据统计和报告复核完成；等待学习者解释六个问题与瓶颈，最终独立 Softmax 验收尚未进行
+Day 11 — 采集、统计与前五个回答的初步 Review 已完成；已讲解 warp stall，等待学习者修正同步/occupancy 表述并完成两个理解检查，最终独立 Softmax 验收尚未进行
 
 ## 已完成
 
@@ -597,12 +597,15 @@ Day 11 — 学习者已完成 Softmax V1/V2/V3 三轮 Event 与 ncu 采集，数
 - `(128,4096)` 三轮 Event 平均为 V1 0.007478333 ms、V2 0.006805333 ms、V3 0.006858667 ms；V2 相对 V1 加速 1.098893×，V3 相对 V2 平均慢约 0.78%。ncu Duration 为 11.07/10.24/10.40 µs，排序相同。
 - 已把三轮 Event、其他形状平均值、吞吐、occupancy、stall 与访存计数填入 `09_ncu/NOTES.md`。V3 在 `(16,512)` 平均快约 5.51%，说明趋势依形状而异；未替学习者完成六个回答与瓶颈分析。
 - ncu 直接证据：V1 → V2 的 shared-load/store 指令分别下降 93.38%/87.50%；V2 → V3 的 global-load request 下降 75%，总 sector 不变。V3 每线程寄存器更多，但 theoretical occupancy 仍是 100%，不能将轻微回退直接归因于 occupancy 下降。
+- 学习者已提交前五个问题的初步回答，并询问 warp stall 的含义与分析指标。向量化收益依条件、request/sector 的关系、不能仅凭 DRAM 判定瓶颈等方向正确；已纠正“barrier 比值变化不大证明同步影响小”和将 occupancy 称为全卡实际利用率的表述。
+- 已从原有报告读取平均驻留 warp 14.00/13.90/14.21 warp/SM、Issue Active 0.24/0.24/0.22，未重新采集。结合 68 SM、32 warp/SM、8 warp/block 与 grid=128，记录不足一整波工作量的证据，不把容量估算当作 achieved occupancy 的精确公式。
+- 已在 Day 11 Notes 与复习问答补充 stall 的含义、五类等待原因、延迟隐藏、访存带宽限制与访存依赖等待的区别；核心分析仍留作学习者复述与判断，没有改 kernel 或替学习者提交最终分析。
 
 ## 当前问题
 
 - Day 10 未将亚微秒 gap 的内部成因与 GPU 纯计算占比独立分解；
   不影响本节定位时间线与区分证据/推断的验收。
-- Day 11 新的同轮 Benchmark/Profile 与数据复核已完成，但六个回答和瓶颈解释尚未提交，暂不验收；采集时同卡其他任务及各次程序退出码未在日志中单列。最终独立 Softmax 验收仍未进行。
+- Day 11 前五个回答已初步 Review，但第 2 条同步贡献推断与第 5 条 occupancy 用语需修正；warp stall 的独立解释与最终瓶颈判断待学习者完成，暂不验收。采集时同卡其他任务及各次程序退出码未在日志中单列，最终独立 Softmax 验收仍未进行。
 
 ## 今日关键知识
 
@@ -611,6 +614,9 @@ Day 11 — 学习者已完成 Softmax V1/V2/V3 三轮 Event 与 ncu 采集，数
 - 本机 WarpStateStats 的 stall 图使用 cycles/instruction，不是 kernel 耗时百分比；ncu replay 的时钟与缓存条件不同于暖机后的 Event，二者不可混用计算加速比。
 - stall 的 `per_issue_active.ratio` 是按发出指令归一化的比值，不能与此前 Reduction 的 `per_warp_active.pct` 混用；比值升降不能直接证明绝对等待周期或同步耗时同比变化。
 - 性能百分比不是评分：本轮更快的 V2，SM Throughput 与 achieved occupancy 都比 V1 略低；V3 request 更少、occupancy 略高，却未在主要形状继续加速。
+- warp stall 表示下一条指令暂时不能发出；其他就绪 warp 可以继续执行，这就是延迟隐藏。等待中的驻留 warp 仍计入 occupancy，它不是“正在计算”的 warp 比例。
+- 长 scoreboard 等 L1/TEX 路径的结果依赖，不等于 DRAM 带宽饱和；本轮配合 Issue Active、DRAM 吞吐、request/sector、驻留 warp 与源码调查，不把最大 stall 直接当作唯一瓶颈。
+- 本轮源码中的 block barrier 阶段从 V1 的 18 个降到 V2 的 4 个，但 shared 与同步同时变化，现有实验没有独立分离各自的加速贡献；归一化 barrier ratio 不能代替总同步耗时。
 - `float4` 每组覆盖四个相邻 FP32 元素；必须检查行首实际地址的
   16 字节对齐，尾部不足四个元素不能直接用完整 `float4` 读取。
 - 某行是否对齐还取决于 `row`：基址对齐时条件为
@@ -671,5 +677,5 @@ Day 11 — 学习者已完成 Softmax V1/V2/V3 三轮 Event 与 ncu 采集，数
 
 ## 下一任务
 
-- 学习者基于已经整理的 `09_ncu/NOTES.md` 回答任务 README 的六个问题，填写 V1/V2/V3 源码解释、瓶颈判断与 V3 为什么赢或输。
-- 先解释现有证据，不必立即改 kernel 或扩展实验；提交回答后再 Review，Day 11 通过后才评估下一任务。
+- 学习者完成 `09_ncu/NOTES.md` 末尾两个理解检查：等待 warp 与其他 warp 的调度/occupancy 关系，以及 long scoreboard、DRAM 与 Issue Active 支持的有限判断；同时修正对 barrier 的推断。
+- 用自己的话完成瓶颈解释，再进行 Day 11 最终 Review；目前不必改 kernel 或扩展采集，验收通过后才评估下一任务。

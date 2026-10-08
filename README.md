@@ -76,6 +76,13 @@ cuda-bootcamp/
 ├── 09_ncu/
 │   ├── README.md
 │   └── NOTES.md
+├── 10_final_softmax/
+│   ├── naive.cu
+│   ├── shared.cu
+│   ├── warp.cu
+│   ├── softmax_final_harness.h
+│   ├── README.md
+│   └── NOTES.md
 └── notes/
     └── bootcamp_summary.md
 ```
@@ -95,9 +102,9 @@ cuda-bootcamp/
 - Day 10 Nsight Systems：三份时间线、传输与同步定位、依赖顺序和
   短 kernel 提交开销分析已完成 Review，验收通过。
 - Day 11 Nsight Compute：三轮对照、Profile、收尾分析与基本调度解释已完成 Review，基础验收通过；绝对瓶颈表述已由导师收紧。
-- Day 12 综合复盘：10 个回答及第 4–7 题修订已完成 Review，复盘通过；最终独立验收尚未开始。
+- Day 12 综合复盘：10 个回答及第 4–7 题修订已完成 Review，复盘通过；最终独立验收仍待完成。
 
-下一阶段是学习计划第 13 节的最终独立 Softmax 验收，尚未创建新框架或开始实现。[Day 12 综合复盘](notes/bootcamp_summary.md) 已通过；Day 11 数据与 Review 保留在 [分析笔记](09_ncu/NOTES.md)。Bootcamp 尚未最终验收完成，RMSNorm/fusion 不作为额外必修门槛。
+当前任务是 [最终独立 Softmax 验收](10_final_softmax/README.md)：三版空 kernel、主机测试支撑与 Event TODO 已准备，先完成朴素版。[Day 12 综合复盘](notes/bootcamp_summary.md) 已通过；Day 11 数据与 Review 保留在 [分析笔记](09_ncu/NOTES.md)。Bootcamp 尚未最终验收完成，RMSNorm/fusion 不作为额外必修门槛。
 详细进度见 `PROGRESS.md`。
 已学习的问题与答案持续整理在 `CUDA_复习与面试问答.md`。
 
@@ -105,17 +112,17 @@ cuda-bootcamp/
 
 ```bash
 cmake -S . -B build
-cmake --build build --target softmax_v1 softmax_v2 softmax_v3 -j 8
-CUDA_VISIBLE_DEVICES=0 ./build/softmax_v1 --correctness-only
+cmake --build build --target softmax_final_naive -j 8
+CUDA_VISIBLE_DEVICES=0 ./build/softmax_final_naive --correctness-only
 ```
 
-通常会注释已完成练习的 CMake target；当前保留 Softmax V1/V2/V3 供复查，Day 12 复盘不新增 target。
+通常会注释已完成练习的 CMake target；当前默认构建最终验收的 naive/shared/warp 三版，旧 Day 9/11 目标已注释归档。
 需要重新构建历史练习时，取消 `CMakeLists.txt` 中对应注释。
 项目级 CUDA 编译架构默认是 `sm_75`（RTX 2080 Ti）：所有通过本项目 CMake
 构建的 CUDA target 都会使用它，包括重新启用的历史 target。它不影响在项目外
 直接调用 `nvcc` 的命令；换 GPU 时可覆盖 CMake 变量 `CUDA_BOOTCAMP_ARCH`。
 
-Day 11 的正确性复查、三轮 Event 对照、ncu 报告与分析见 `09_ncu/README.md` 和 `09_ncu/NOTES.md`；已完成基础验收，不要求默认重新采集。当前 Day 12 综合复盘不新增 kernel。Day 10 历史时间线与记录保留在 `08_nsys/`。
+Day 11 的正确性复查、三轮 Event 对照、ncu 报告与分析见 `09_ncu/README.md` 和 `09_ncu/NOTES.md`；已完成基础验收，不要求默认重新采集。最终验收使用新的独立实现与本轮数据，不以旧结果代替；空框架应 FAIL。Day 10 历史时间线与记录保留在 `08_nsys/`。
 
 ## 协作方式
 

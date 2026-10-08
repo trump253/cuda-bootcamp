@@ -78,15 +78,15 @@ endfunction()
 # add_executable(softmax_v0 07_softmax/v0.cu)
 # target_include_directories(softmax_v0 PRIVATE common 07_softmax)
 
-# Day 11 单 kernel 分析：复用已验收的 FP32 Softmax V1/V2/V3。
-add_executable(softmax_v1 07_softmax/v1.cu)
-target_include_directories(softmax_v1 PRIVATE common 07_softmax)
+# Day 9/11 已完成；需要复查旧实现时取消以下六行注释。
+# add_executable(softmax_v1 07_softmax/v1.cu)
+# target_include_directories(softmax_v1 PRIVATE common 07_softmax)
 
-add_executable(softmax_v2 07_softmax/v2.cu)
-target_include_directories(softmax_v2 PRIVATE common 07_softmax)
+# add_executable(softmax_v2 07_softmax/v2.cu)
+# target_include_directories(softmax_v2 PRIVATE common 07_softmax)
 
-add_executable(softmax_v3 07_softmax/v3.cu)
-target_include_directories(softmax_v3 PRIVATE common 07_softmax)
+# add_executable(softmax_v3 07_softmax/v3.cu)
+# target_include_directories(softmax_v3 PRIVATE common 07_softmax)
 
 # Day 9 FP16 已完成；同一源码可重新构建标量基线与 half2 练习版。
 function(add_softmax_fp16_target target_name use_half2)
@@ -98,3 +98,14 @@ endfunction()
 
 # add_softmax_fp16_target(softmax_fp16_scalar 0)
 # add_softmax_fp16_target(softmax_fp16_half2 1)
+
+# 最终独立验收：只复用主机测试支撑，不链接旧 Softmax kernel。
+function(add_final_softmax_target target_name source_name)
+    add_executable(${target_name} 10_final_softmax/${source_name})
+    target_include_directories(
+        ${target_name} PRIVATE common 07_softmax 10_final_softmax)
+endfunction()
+
+add_final_softmax_target(softmax_final_naive naive.cu)
+add_final_softmax_target(softmax_final_shared shared.cu)
+add_final_softmax_target(softmax_final_warp warp.cu)

@@ -63,8 +63,9 @@ CUDA_VISIBLE_DEVICES=0 nsys profile --trace=cuda,nvtx \
   ./build/reduction_v3 --timeline
 ```
 
-可在 Nsight Systems 图形界面打开 `.nsys-rep`；若远程环境不方便
-开图形界面，先用本机提供的 CLI 报表查看事件与时间戳：
+可在 Nsight Systems 图形界面打开 `.nsys-rep`。当前 SSH 容器已有通过浏览器访问 `nsys-ui` 的方案，连接、缺库修复与重启步骤见 [GUI.md](GUI.md)。
+
+也可用本机提供的 CLI 报表辅助查看事件与时间戳：
 
 ```bash
 nsys stats --report cudaapitrace --report gputrace \

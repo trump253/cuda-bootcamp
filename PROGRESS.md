@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-Day 10 — Nsight Systems 时间线练习框架已就绪；学习者尚未采集和解释三份正式报告，最终独立 Softmax 验收尚未进行
+Day 10 — 容器内 Nsight Systems GUI 与 noVNC 已启动并验证；三份正式报告的完整采集与解释尚未完成，最终独立 Softmax 验收尚未进行
 
 ## 已完成
 
@@ -520,17 +520,27 @@ Day 10 — Nsight Systems 时间线练习框架已就绪；学习者尚未采集
   Docker/Podman；尚未安装或启动 Streamer，也未验证浏览器连接。
 - 学习者确认只能使用当前容器。检查发现 `/.dockerenv` 存在、控制组
   路径含 `kubepods`；无 Docker socket，也未配置 `DOCKER_HOST`。
-  `nsys-ui` 已在 PATH 中，Xvfb、VNC server、noVNC 启动命令未找到。
-  现有两份报告各约 150 KiB；目前建议下载到本地 GUI 查看。
+  初次排查时 `nsys-ui` 已在 PATH 中，Xvfb、VNC server、noVNC 启动命令未找到。
+  当时的两份报告各约 150 KiB，首先讨论了下载到本地 GUI 的方案。
+- 2026-10-08：已清理复习问答正文和列表项内的硬换行；格式整理阶段
+  从 870 行合并到 478 行，Markdown 解析核对确认正文、代码块、
+  标题、列表与链接保持一致；随后补充了本次 GUI 缺库排查问答。
+- 已修复 GUI 的 `libOpenGL.so.0`、`libEGL.so.1`、报告插件所需
+  NSS/NSPR 库及 JPEG 插件依赖。主程序、CrashReporter 与 xcb
+  平台插件的动态库检查通过，QuadDPlugin 已能加载。
+- 已在当前容器安装并启动 Xvfb、Openbox、x11vnc、noVNC；Mesa
+  llvmpipe 的 OpenGL 3.1 检查通过。HTTP 页面返回 200，WebSocket
+  升级返回 101，RFB 帧缓冲与鼠标输入验证通过。
+- 已实际打开 `build/day10_vector_add.nsys-rep`，确认 GUI 中显示
+  时间线与 CUDA API/GPU 行；新增 `08_nsys/GUI.md` 记录 SSH / VS Code
+  端口转发、环境变量、缺库修复及重启步骤。此项验证不替代学习者分析。
 
 ## 当前问题
 
 - Day 10 的三份正式报告与四个时间线问题仍待学习者完成；
   Day 11 与最终独立 Softmax 验收尚未进行。
-- 当前容器没有桌面，也没有已配置的 Docker daemon 访问入口，
-  目前无法直接按官方 Docker 方式启动 Nsight Streamer。
-  若需在浏览器查看，可评估当前容器内的虚拟显示、VNC、noVNC 方案；
-  依赖尚未配置，浏览器到容器端口的访问方式仍未确认。
+- 容器侧 GUI 和浏览器中转已经验证；学习者本地浏览器的 SSH
+  端口转发与交互显示仍待确认。当前入口为远程端口 `6080`。
 
 ## 今日关键知识
 
@@ -574,12 +584,16 @@ Day 10 — Nsight Systems 时间线练习框架已就绪；学习者尚未采集
 - 容器内找不到 Docker 不代表宿主机没有 Docker；单独安装 Docker
   客户端也不等于能创建容器。Docker bind mount 的源路径属于 daemon
   所在宿主机，不能直接假定当前容器的报告路径就是宿主机路径。
+- `nsys-ui` 的 OpenGL 版本 `0` 可能来自显示探测失败，不能据此
+  判断显卡能力。需分别检查动态库、显示入口和渲染能力；运行时
+  加载的报告插件还可能有主程序 `ldd` 未覆盖的依赖。
+- Xvfb 提供容器内虚拟屏幕；VNC/noVNC 与 SSH 转发让本地浏览器
+  能访问它。当前软件渲染经 `glxinfo` 和 GUI 日志验证为 OpenGL 3.1。
 
 ## 下一任务
 
-- 先解决报告查看方式：建议将约 150 KiB 的报告下载到本地 Nsight
-  Systems GUI；若需要浏览器方案，先确认当前容器的端口访问入口，
-  再配置虚拟显示、VNC 和 noVNC。暂时可用现有 CLI 报表查看事件。
+- 按 `08_nsys/GUI.md` 转发远程端口 `6080`，在本地浏览器连接
+  已启动的 GUI，完成 Vector Add 报告的时间线观察。
 - 学习者按照 `08_nsys/README.md` 亲自采集 Vector Add、Softmax V2、
   Reduction V3 三份报告，填写 `08_nsys/NOTES.md`，提交关键截图
   或 CLI 片段及四个问题的答案供 Review。达到 Day 10 验收后再进入

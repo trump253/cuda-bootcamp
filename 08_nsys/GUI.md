@@ -34,6 +34,22 @@ nsys-ui build/day10_vector_add.nsys-rep
 
 打开报告后，展开 GPU 下的 CUDA HW 行查看 kernel 与内存传输，再查看进程/线程下的 CUDA API 行。先缩放到第二组较大的 Vector Add 用例，按 [README.md](README.md) 的四个问题记录 CPU 调用、GPU 执行和同步。启动 GUI 的环境验证不替代 Day 10 的时间线分析验收。
 
+## 关闭窗口后重新打开
+
+只关闭本地浏览器标签页时，重新访问上面的 noVNC 入口即可，服务器上的程序继续运行。点击 Nsight Systems 标题栏的关闭按钮后，GUI 程序会退出；此时 noVNC 可能仍然连接着，但只显示黑色桌面。需要在容器的 SSH / VS Code 终端重新启动 GUI：
+
+```bash
+cd /root/ai-infra-learning/cuda-bootcamp
+mkdir -p build/nsys-gui
+nohup env DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 __GLX_VENDOR_LIBRARY_NAME=mesa \
+  QTWEBENGINE_CHROMIUM_FLAGS=--no-sandbox \
+  nsys-ui "$PWD/build/day10_vector_add.nsys-rep" \
+  >>build/nsys-gui/nsys-ui.log 2>&1 </dev/null &
+printf '%s\n' "$!" >build/nsys-gui/nsys-ui.pid
+```
+
+命令会在后台打开 Vector Add 报告，输出追加到 `build/nsys-gui/nsys-ui.log`，浏览器中的窗口会重新出现。查看其他报告时，替换 `.nsys-rep` 路径。已有的 Xvfb、x11vnc 和 websockify 继续使用；整个容器重启后则按后面的完整启动步骤恢复。
+
 ## 简体中文与画面流畅度
 
 Ubuntu 自带的 noVNC 1.0 中文翻译使用繁体。本次使用官方 noVNC 1.7.0 的 `zh_CN` 翻译，并固定这个浏览器入口使用简体中文；侧边栏的“连接”“设置”“剪贴板”等已验证。Nsight Systems 程序本身的菜单仍为英文。

@@ -104,7 +104,7 @@ cuda-bootcamp/
 - Day 11 Nsight Compute：三轮对照、Profile、收尾分析与基本调度解释已完成 Review，基础验收通过；绝对瓶颈表述已由导师收紧。
 - Day 12 综合复盘：10 个回答及第 4–7 题修订已完成 Review，复盘通过；最终独立验收仍待完成。
 
-当前任务是 [最终独立 Softmax 验收](10_final_softmax/README.md)：三版实现与 Event 已完成，正确性、memcheck、源码及 Profile 已检查；交替对照的 naive 首轮偏慢，待一组复测及学习者自己的最终总结。完整数据与 Review 见 [最终实验记录](10_final_softmax/NOTES.md)。[Day 12 综合复盘](notes/bootcamp_summary.md) 已通过；Bootcamp 尚未最终验收完成，RMSNorm/fusion 不作为额外必修门槛。
+当前任务是 [最终独立 Softmax 验收](10_final_softmax/README.md)：实现、正确性、memcheck、Event、Profile 及交替三轮复测已检查通过；学习者解释初稿已提交，仅待跨 warp 可见性、request/sector 与单指标判断的简短修订及独立实现确认，不再追加代码或测量。完整数据与 Review 见 [最终实验记录](10_final_softmax/NOTES.md)。[Day 12 综合复盘](notes/bootcamp_summary.md) 已通过；Bootcamp 尚未最终验收完成，RMSNorm/fusion 不作为额外必修门槛。
 详细进度见 `PROGRESS.md`。
 已学习的问题与答案持续整理在 `CUDA_复习与面试问答.md`。
 

@@ -1,8 +1,8 @@
 # 最终独立 Softmax 验收
 
-状态：2026-10-09 三版 kernel 与 Event 已实现，23 个 shape 的正确性及 memcheck 通过；源码和 Profile 已完成导师 Review。同条件三轮对照中 naive 首轮明显偏慢，复测与学习者自己的最终总结待完成，尚未通过最终验收。对应 [学习计划第 13 节](../CUDA_Bootcamp_Learning_Plan.md)，不是增加一轮完整 CUDA 课程。
+状态：2026-10-09 三版 kernel、Event、23 个 shape 正确性、memcheck 与 Profile 已 Review，整组暖机后的同条件三轮复测也已通过。学习者解释初稿已提交；跨 warp 可见性、request/sector 和单指标判断仍待简短修订，尚未通过最终验收。对应 [学习计划第 13 节](../CUDA_Bootcamp_Learning_Plan.md)，不是增加一轮完整 CUDA 课程。
 
-本轮数据、波动范围与 Review 见 [NOTES.md](NOTES.md)。下方保留原任务流程供复查，不必重新完成已经通过的正确性或重采现有 ncu；目前只需执行 Notes 第 3.3 节的一组交替复测，并用自己的话补齐第 5 节和本 README 末尾的简短总结。导师没有替你改写 kernel 或补写个人结论。
+本轮数据、波动范围与 Review 见 [NOTES.md](NOTES.md)：第 3.4 节为已完成的复测，第 5 节分别保存学习者原回答与导师反馈。下方保留原任务流程供复查；无需再写 kernel、复测或重采 ncu，只需修订第 3/4 点、用一个反例解释第 5 点，并确认独立实现情况。接受对话中提交，随后归档最终总结；第 6 点沿用已验收的 Day 10，不另加作业。
 
 ## 1. 最少理论与接口
 
@@ -137,7 +137,7 @@ CUDA_VISIBLE_DEVICES=0 nsys profile --trace=cuda --sample=none \
 - [ ] 从空 kernel 独立完成朴素版，不复制旧完整实现。
 - [x] 两版优化展示 shared/reduction 和 warp/shuffle，当前接口与测试范围内边界与同步正确。
 - [x] 三版全部正确性通过，CUDA 错误检查有效，memcheck 无错误与泄漏。
-- [ ] 独立补齐 Event 核心步骤，三版同条件 Benchmark 可复现，明确计时范围与单位。
+- [x] 已补齐 Event 核心步骤，三版同条件 Benchmark 完成复测，计时范围与单位已核对；小 shape 不稳定收益已明确记录。
 - [ ] 使用 Nsight Compute 解释性能与限制，不把单个指标当作因果证明；会区分 Nsight Systems 的时间线口径。
 - [ ] README/NOTES 解释每版改变了什么、预期影响、实际证据和未证实原因。
 
@@ -145,4 +145,4 @@ CUDA_VISIBLE_DEVICES=0 nsys profile --trace=cuda --sample=none \
 
 ## 我的最终总结（由学习者填写）
 
-待完成后填写：实现思路、边界/同步设计、计时范围、两次优化的测量证据和仍存在的限制。
+学习者已提交实现解释初稿，原文和反馈见 Notes 第 5 节。第 1 点正确区分线程内连续访问与 warp 合并访问，第 2 点正确解释初始化与逐轮 tree barrier；第 3/4/5 点修订后再归档完整总结，不将导师解释直接写成学习者已自行修正的答案。Event 流程已由实现和复测核对，不重复考核全部问题。

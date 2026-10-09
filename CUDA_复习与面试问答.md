@@ -225,6 +225,8 @@ Day 12 复盘提醒：寄存器交换不能一概叫作广播。广播让多个 
 
 不能。`__shfl_down_sync` 在同一 warp 内完成 mask 所指定 lane 的参与/收敛与寄存器交换，但它不是通用 shared/global memory fence，也不能同步不同 warp。8 个 warp leader 写完 `warp_sums` 后，仍需一次 `__syncthreads()`，warp 0 才能安全读取。
 
+最终 Softmax 还需注意第二次交接：warp 0 把最终 max/sum 写到 `row_max_shared` / `row_sum_shared` 后，必须经过后面的 block barrier，才能保证其他 warp 的后续读取在写入完成之后。shared 表示共享作用域，不自动提供跨 warp 的执行顺序；“写入了 shared”不等于“其他 warp 已经可以安全读最终结果”。来源：[CUDA 11.8 同步函数](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-c-programming-guide/index.html#synchronization-functions)。
+
 ### V3 更快是否只是因为 shuffle 比 shared memory 快？
 
 不能只归因于单条指令的速度。V3 把大部分 warp 内数据交换留在寄存器中，使每个 block 使用的 shared memory 从 V2 的 256 个 float 降到 8 个 float，并把 block barrier 从 V2 的初始化后一次加 8 轮归约同步，降到 warp 间交接所需的一次；同时也减少了 shared load/store 和控制工作。大尺寸 Benchmark 已证明整体 V3 更快：`N=2^20` 加速约 1.688×，`N=2^24` 加速约 1.750×。
@@ -416,6 +418,10 @@ sector 是对齐的 32 字节区域。当前 `N=2^24`、输入地址对齐、连
 
 17 个正确性用例与 Compute Sanitizer 均通过。相同构建配置下，三轮 CUDA Event 的 V1 延迟均值从 `0.025122 ms` 降到 `0.005178 ms`，约快 `4.852×`。这两组证据分别证明读取侧请求更集中、整个 kernel 更快；但写回映射和编译后的指令路径也可能随之变化，不能把全部 `4.852×` 加速只归因于 global load sector 减少。sector 也不是实际 DRAM 读取量，ncu 的 `10.94 µs` 不与正常 Event 绝对时长混比。本轮 V0 的第一轮延迟异常偏高，跨版本比较时不要机械地取该三轮均值。
 
+### Shared Softmax 规约是否等于把 input 缓存起来、减少 global-load request？
+
+不是。本轮最终 shared 版的共享数组保存线程的局部 max/sum，input 仍在求 max、指数和、写归一化输出时读三遍。`(128,4096)` 的 naive/shared/warp global-load request 都是 49152；naive → shared 的 sector 从 1572864 降到 196608，即每请求从 32 降到 4，是同一条 warp 指令的地址更集中，而非读取请求条数下降。主 shape 的 grid 还从 1 增到 128，跨 SM 并行度也同时改变。不能照搬 GEMM 的“缓存输入 tile 以减少重复读取”解释 Softmax 规约；也不能把 L1/TEX sector 直接当作 DRAM 流量。源码与证据见 [最终 Softmax 实验](10_final_softmax/NOTES.md)。
+
 ### V1 的 `__syncthreads()` 分别保护什么？
 
 每个线程先独立扫描自己负责的列，然后把局部 max 写入 `shared_max[tid]`；第一次 barrier 保证整个 block 的局部值已经写好，其他线程才能开始读取 `shared_max[tid+stride]`。在 tree 的每一轮中，活跃线程更新一部分 shared 值；轮末 barrier 保证本轮写入对下一轮读取可见。特别是最后 `stride=1` 后也要让所有线程看到 `shared_max[0]` 的最终值。
@@ -544,6 +550,10 @@ block 可以分布到多个 SM 并行，kernel Duration 不要求随 block 数�
 不是。Day 11 采集的是 `smsp__average_warps_issue_stalled_barrier_per_issue_active.ratio`；本机 raw 输出把单位显示为 `inst`，但 `WarpStateStats` section 的图轴为 `Cycles per Instruction`，语义是按发出指令数归一化的 warp 等待周期比值。此前 Reduction 使用 `per_warp_active.pct`，分母与单位不同，不能混用。V2/V3 的 barrier ratio 为 1.10/1.83，即使源码都只有 4 次 block barrier，也不能根据该比值断言 barrier 数量、绝对等待周期或总同步耗时同比增加；指令数变化与到达 barrier 的时序都可能影响结果，具体原因还需证据。来源：[NVIDIA WarpStateStats 说明](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#sections-and-rules)。
 
 V1/V2 的 shared-load/store 指令数明显下降，配合 Event 变快支持优化假设，但不能据 barrier ratio 的变化幅度说同步影响很小。源码中 V1 的 max/sum 各有 1 次初始同步与 8 次 tree 同步，共 18 个阶段；V2 共 4 个。两种成本同时改变，当前对照没有独立分离 shared 访问与同步的收益贡献。
+
+### “不要单看 occupancy、吞吐或最大 stall 下结论”具体是什么意思？
+
+这些指标不是性能评分。最终 Softmax 的 warp 版在 `(128,4096)` 本轮复测平均更快约 7.79%，但 ncu 的 achieved occupancy 为 shared 43.82% / warp 43.46%，SM Throughput 为 27.11% / 20.23%，long scoreboard 为 6.37 / 6.60 cycles/instruction。因此较低占用率或吞吐百分比、较高某个 stall 比值不自动表示更慢；最大 stall 也不能独立证明唯一瓶颈。先比较同配置 Event 的延迟与波动，再结合源码变化、访存指令/sector、Issue Active 和相关资源指标说明支持哪些推断，不把等待比值当作总耗时百分比。来源：[NVIDIA Profile sections](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#sections-and-rules)，本轮数值见 [最终 Softmax 记录](10_final_softmax/NOTES.md)。
 
 ### warp stall 是什么？是不是整个 GPU 暂停，或者这个 warp 不再计入 occupancy？
 

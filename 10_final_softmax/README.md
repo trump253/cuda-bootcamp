@@ -1,8 +1,8 @@
 # 最终独立 Softmax 验收
 
-状态：2026-10-09 三版 kernel、Event、23 个 shape 正确性、memcheck 与 Profile 已 Review，整组暖机后的同条件三轮复测也已通过。学习者解释初稿已提交；跨 warp 可见性、request/sector 和单指标判断仍待简短修订，尚未通过最终验收。对应 [学习计划第 13 节](../CUDA_Bootcamp_Learning_Plan.md)，不是增加一轮完整 CUDA 课程。
+状态：2026-10-09 最终独立 Softmax 验收通过。三版 kernel、Event、23 个 shape 正确性、memcheck、同条件三轮复测、Profile、实现解释及独立实现确认均已完成 Review。对应 [学习计划第 13 节](../CUDA_Bootcamp_Learning_Plan.md)，Bootcamp 到此结束。
 
-本轮数据、波动范围与 Review 见 [NOTES.md](NOTES.md)：第 3.4 节为已完成的复测，第 5 节分别保存学习者原回答与导师反馈。下方保留原任务流程供复查；无需再写 kernel、复测或重采 ncu，只需修订第 3/4 点、用一个反例解释第 5 点，并确认独立实现情况。接受对话中提交，随后归档最终总结；第 6 点沿用已验收的 Day 10，不另加作业。
+本轮数据、波动范围与 Review 见 [NOTES.md](NOTES.md)：第 3.4 节为复测，第 5 节分别保存学习者原回答、导师反馈、最终修订与验收结论。下方原任务流程仅供复查；全部必修交付已完成，不再追加 kernel、测量或复盘题。Nsight Systems 能力沿用已通过的 Day 10。
 
 ## 1. 最少理论与接口
 
@@ -134,15 +134,24 @@ CUDA_VISIBLE_DEVICES=0 nsys profile --trace=cuda --sample=none \
 
 提交三个源文件、Event TODO 实现、构建输出、23 个 shape 的正确性输出及退出码、三版 memcheck、三轮原始 Event 结果、三份 ncu 输出/报告位置，以及完成的 NOTES。最后在本 README 下方用自己的话简要总结实现和优化过程。
 
-- [ ] 从空 kernel 独立完成朴素版，不复制旧完整实现。
+- [x] 从空 kernel 独立完成朴素版，不复制旧完整实现；学习者已确认。
 - [x] 两版优化展示 shared/reduction 和 warp/shuffle，当前接口与测试范围内边界与同步正确。
 - [x] 三版全部正确性通过，CUDA 错误检查有效，memcheck 无错误与泄漏。
 - [x] 已补齐 Event 核心步骤，三版同条件 Benchmark 完成复测，计时范围与单位已核对；小 shape 不稳定收益已明确记录。
-- [ ] 使用 Nsight Compute 解释性能与限制，不把单个指标当作因果证明；会区分 Nsight Systems 的时间线口径。
-- [ ] README/NOTES 解释每版改变了什么、预期影响、实际证据和未证实原因。
+- [x] 使用 Nsight Compute 解释性能与限制，不把单个指标当作因果证明；会区分 Nsight Systems 的时间线口径。
+- [x] README/NOTES 解释每版改变了什么、预期影响、实际证据和未证实原因。
 
-导师 Review 通过这些实际证据后，才结束 Bootcamp 并进入 CUDALM。FP16/half2、float4、RMSNorm、fusion 不新增为本次必修版本。
+导师已根据上述实际证据完成最终 Review。CUDA Bootcamp 已达到进入 CUDALM 的最低能力门槛。停止继续扩展 Bootcamp；FP16/half2、float4、RMSNorm、fusion 不新增为本次必修版本。
 
-## 我的最终总结（由学习者填写）
+## 最终总结（依据源码、学习者回答与实验归档）
 
-学习者已提交实现解释初稿，原文和反馈见 Notes 第 5 节。第 1 点正确区分线程内连续访问与 warp 合并访问，第 2 点正确解释初始化与逐轮 tree barrier；第 3/4/5 点修订后再归档完整总结，不将导师解释直接写成学习者已自行修正的答案。Event 流程已由实现和复测核对，不重复考核全部问题。
+以下是本轮实现与答复的归档摘要，不是学习者原话的逐字引用；原始回答、修订与导师修正见 Notes 第 5 节。
+
+- naive：一个线程处理一行，稳定 Softmax 分别求 max、指数和并写归一化结果。长行的相邻 lane 地址以 hidden 为步长；单线程循环读取相邻元素是时间局部性，不等于同一条 warp 指令的合并访问。
+- shared：一个 block 处理一行，线程按 tid 起步、以 block 大小遍历列。局部 max/sum 写 shared，再用连续活跃线程的 tree reduction；无有效列贡献 -INFINITY/0，但仍到达初始化及逐轮 barrier。shared 缓存的是规约中间值，不是整行 input。
+- warp：每 warp 用 shuffle 合并寄存器中的局部结果，leader 写 shared partial；block barrier 后由 warp 0 做第二级规约，写行标量后再同步，整个 block 才安全读取。无有效数据的 lane 用单位元参与；full mask 声明参与集合，并不自动激活跳过调用的线程。
+- 计时与验证：CPU double Reference、23 个 shape、CUDA 错误检查和 memcheck 通过。Event 在同一 default stream 包围 100 次 launch，计时外分配、传输和暖机 10 次，等待 stop 后求平均；不混用 ncu replay 的 Duration。
+- 优化一：主 shape 的 grid 从 1 增到 128，跨 SM 并行度与合并访问同时改善。global-load request 保持 49152，sector 从 1572864 降到 196608，即每 request 从 32 降到 4，不将其解释成 input 读取次数减少。
+- 优化二：shared-load/store warp 指令分别从 34816/18432 降到 2304/2304，block barrier 阶段从 18 降到 4；两项成本同时变化，未独立分离各自贡献。
+- 同配置复测：在 (128,4096) 上 naive/shared/warp 平均为 1.238534333/0.005207333/0.004801667 ms。shared 相对 naive 加速约 237.844×，warp 相对 shared 延迟降低约 7.79%；(128,1024) 的第二次优化降低约 16.31%。小尺寸收益或幅度不稳定，所有实验组分别保留，不挑选轮次或推广到所有形状。
+- 指标与限制：warp 更快，不要求 occupancy、SM 吞吐百分比同时升高，也不能据最大 stall 认定唯一瓶颈。学习者最后答复中的 DRAM 方向由导师核对为 33.09%→35.76%（上升）；SM 为 27.11%→20.23%（下降）。该数值修正不改变“指标不是性能评分”的结论。现有证据不等于完整生产级 Softmax 或所有 workload 的性能保证。

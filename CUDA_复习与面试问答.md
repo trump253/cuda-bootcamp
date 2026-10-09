@@ -555,6 +555,8 @@ V1/V2 的 shared-load/store 指令数明显下降，配合 Event 变快支持优
 
 这些指标不是性能评分。最终 Softmax 的 warp 版在 `(128,4096)` 本轮复测平均更快约 7.79%，但 ncu 的 achieved occupancy 为 shared 43.82% / warp 43.46%，SM Throughput 为 27.11% / 20.23%，long scoreboard 为 6.37 / 6.60 cycles/instruction。因此较低占用率或吞吐百分比、较高某个 stall 比值不自动表示更慢；最大 stall 也不能独立证明唯一瓶颈。先比较同配置 Event 的延迟与波动，再结合源码变化、访存指令/sector、Issue Active 和相关资源指标说明支持哪些推断，不把等待比值当作总耗时百分比。来源：[NVIDIA Profile sections](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#sections-and-rules)，本轮数值见 [最终 Softmax 记录](10_final_softmax/NOTES.md)。
 
+最终修订中还出现过“DRAM 和 SM 吞吐都下降”的数值笔误：本轮 DRAM 实际从 33.09% 升到 35.76%，下降的是 SM 的 27.11%→20.23%。复习时应先核对原始表格、指标名与单位，再形成解释；该修正不改变“性能不是百分比评分”的结论。
+
 ### warp stall 是什么？是不是整个 GPU 暂停，或者这个 warp 不再计入 occupancy？
 
 stall 是某个 warp 的下一条指令暂时不能发出。比如读 input 后立即用它求 max，如果所需数据还没返回，该 warp 必须等待依赖满足；其他就绪 warp 仍可能被 scheduler 选中执行，从而隐藏等待延迟。等待数据或 block barrier 的驻留 warp 仍计入 occupancy，所以 occupancy 高不等于这些 warp 都已就绪，也不等于每周期都能发出指令。报告里的 selected/not selected 是调度状态，不能一概理解为真正的依赖等待。来源：[NVIDIA 调度与 warp 状态说明](https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#sections-and-rules)。

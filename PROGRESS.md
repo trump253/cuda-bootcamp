@@ -2,7 +2,7 @@
 
 ## 当前阶段
 
-最终独立 Softmax 验收 — 框架已准备，等待学习者先实现朴素版；尚未通过最终验收
+最终独立 Softmax 验收 — 三版实现、Event、正确性及 Profile 已 Review；待交替对照复测与学习者总结，尚未通过最终验收
 
 ## 已完成
 
@@ -616,16 +616,26 @@
 - 已预置 23 个正确性 shape、四个 Benchmark shape、单次 `(128,4096)` Profile 入口、中文任务与空实验记录；性能输出使用 ms，未完成计时拒绝生成数字，正确性失败停止 Benchmark。CMake 默认目标切换为三个最终验收框架，保留 Debug/sm_75，未替学习者完成 kernel 或采集正式实验。
 - 三个框架均已用 CUDA 11.8 编译通过，编译数据库只含三个新目标、继承 sm_75、无设备 -G。空 kernel 各 23 项 FAIL、退出码 1，单次 Profile 用例也 FAIL；帮助/非法参数分别返回 0/2，未输出性能数字。
 - 临时主机 Reference 回填自检通过 23 个 shape，并验证正确性通过后仍会拒绝未完成的 Event 计时；该自检不含 GPU Softmax 算法，不计为学习者验收。任务文档中的 Bash 代码块通过语法检查，本机 ncu 支持所列四个 section，未代采新的 Benchmark/Profile。已确认空实现和未完成计时不会伪装成通过。
+- 2026-10-09：学习者已提交最终 naive/shared/warp 三版实现及四个 Event 核心步骤。导师逐文件 Review，未改写源码；三目标构建成功，导师仅复跑每版 23 项正确性，全部 PASS、退出码为 0，未代跑新的 Benchmark/Profile。
+- 本轮附件共 463 条正确性 PASS、0 条 FAIL，每版覆盖 23 个独立 shape；学习者提交的三版 memcheck 均为 0 errors、0 bytes leaked。naive 正确性及 memcheck 明确打印退出码 0，shared/warp 原日志未单列退出码，但 set -e 循环继续完成。
+- 已分开整理 naive 独立三轮与三版交替对照三轮，保留所有原值。naive 独立基线在 `(128,4096)` 平均 1.242352 ms、极差/平均约 0.088%；交替组为 1.522018/1.240240/1.238577 ms，极差/平均约 21.25%，不删除首轮或拼接成稳定倍数。
+- shared/warp 在 `(128,4096)` 的交替组三轮平均分别为 0.005215000/0.004731333 ms，加速约 1.102×、延迟降低约 9.27%；两版极差/平均均低于 1%。`(128,1024)` 延迟降低约 16.34%，小尺寸波动明显，未确认稳定收益。
+- 已只读导入学习者的三份 ncu 报告，各 14 passes；naive/shared/warp 的 global-load request 均为 49152，sector 为 1572864/196608/196608；shared → warp 的 shared-load/store 指令为 34816→2304、18432→2304，降低 93.38%/87.50%。源码 block barrier 阶段为 18→4，未独立分离各项成本贡献。
+- 三轮 Event、正确性最大误差、环境、计时口径、六类 Profile 与导师判断已整理到 `10_final_softmax/NOTES.md`；学习者解释及 README 最终总结仍留空。已给出一组最小交替复测，不要求重采未修改实现的 ncu 或添加新的算子，尚未宣布最终验收通过。
 
 ## 当前问题
 
 - Day 10 未将亚微秒 gap 的内部成因与 GPU 纯计算占比独立分解；
   不影响本节定位时间线与区分证据/推断的验收。
 - Day 11 基础验收已通过，但未证明唯一瓶颈、同步贡献和 V3 回退的精确原因；这些不是本节必须追加实验的目标。采集时同卡其他任务及各次程序退出码未在日志中单列，限制结果的推广，不将其写成跨环境保证。
-- Day 12 复盘通过，但不能代替从空文件独立实现的证据。最终框架中的三版 kernel、启动配置与 Event 核心步骤尚未完成；需学习者落实规约、边界、同步、正确性、Benchmark、至少两版优化、Nsight Compute 与 Notes。
+- 最终三版 kernel、启动配置与 Event 已实现并通过代码/正确性检查，但学习者尚未提交自己的实现与优化总结；从空框架独立实现、未复制旧完整 kernel 的说明也待确认。导师整理的数值与 Review 不代替学习者理解。
+- 最终交替 Benchmark 中 naive 首轮偏慢，小尺寸 shared/warp 波动明显；实际升频、温度与同卡其他任务没有逐次记录。需保留原组并做一次相同条件复测，若仍有波动则限定结论，不将推断写成确定原因或要求无限复测。
 
 ## 今日关键知识
 
+- 同一提交中的独立基线与交替对照是不同实验组；不能挑选较快轮次或跨组拼接精确加速比。预先安排整组暖机，再保留三轮原值、平均值与波动范围。
+- 本轮 naive → shared 同时改变线程映射、跨 SM 工作量及合并访问；shared → warp 同时减少 shared 指令和 block barrier。性能支持优化组合，不等于独立证明某一项贡献。
+- 主要 shape 上 shared → warp 延迟更低，achieved occupancy 与 SM Throughput 却略低；优化是否有效首先看同口径 Event，再结合 Profile 解释范围和限制。
 - 复盘答案与已有代码/实验合并 Review，可结束书面概念复盘；没有因此证明新 kernel 的独立实现能力，最终 Softmax 验收仍必须实际完成。
 - 暖机处理首次初始化、首次执行与升频等非稳态影响，不会消除每次 launch 的稳态成本；本框架 start/stop 包住整个重复循环，同步 stop 后按 iterations 求平均，计时外做分配/传输与正确性检查。
 - 各 warp 的 partial 写 shared 后必须同步再读取；共享的行 max/sum 写好后也要同步，不能只交换寄存器就认为跨 warp 已可见。
@@ -705,7 +715,7 @@
 
 ## 下一任务
 
-- 先填写 `10_final_softmax/naive.cu` 的 kernel 与启动配置，构建并完成 23 个 shape 的正确性与 memcheck；提交源码和两份输出给导师 Review，不复制旧完整 kernel。
-- 朴素版正确性通过后补齐 Event 四个核心步骤，测三轮基线并先采集 naive Profile/记录；再依次实现 shared 与 warp，每版完成验证、测量、Profile 与 Notes，最终做同配置三轮对照，不再追加书面复盘作业。
-- 最终任务保留 Reference → Naive → Correctness → Benchmark → Profile → 至少两版优化 → Re-benchmark → Notes 闭环，核心实现与实验由学习者完成；导师只提供接口、测试支撑与 Review。
+- 学习者执行 `10_final_softmax/NOTES.md` 第 3.3 节的一组整批暖机与交替三轮复测，提交原始输出；不需要改 kernel 或重新采集现有 ncu。
+- 用自己的话补齐 Notes 第 5 节（可合为三段短回答，接受对话中提交）与 README 最终总结，说明实现、边界/同步、Event 范围、两次优化证据和不稳定收益；确认本轮从空框架独立完成、未复制旧完整 kernel。
+- 导师根据复测和学习者解释完成最后 Review。现有正确性/内存安全不重复做，不要求证明唯一瓶颈，不新增算子；通过最终验收后停止扩展 Bootcamp。
 - RMSNorm/fusion 为可选练习，不追加为毕业条件。最终验收通过后进入 CUDALM，不能仅凭 Day 12 复盘通过宣布整个 Bootcamp 完成。

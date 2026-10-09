@@ -1,6 +1,8 @@
 # 最终独立 Softmax 验收
 
-状态：框架已准备，核心实现未完成，尚未通过最终验收。对应 [学习计划第 13 节](../CUDA_Bootcamp_Learning_Plan.md)，不是增加一轮完整 CUDA 课程。
+状态：2026-10-09 三版 kernel 与 Event 已实现，23 个 shape 的正确性及 memcheck 通过；源码和 Profile 已完成导师 Review。同条件三轮对照中 naive 首轮明显偏慢，复测与学习者自己的最终总结待完成，尚未通过最终验收。对应 [学习计划第 13 节](../CUDA_Bootcamp_Learning_Plan.md)，不是增加一轮完整 CUDA 课程。
+
+本轮数据、波动范围与 Review 见 [NOTES.md](NOTES.md)。下方保留原任务流程供复查，不必重新完成已经通过的正确性或重采现有 ncu；目前只需执行 Notes 第 3.3 节的一组交替复测，并用自己的话补齐第 5 节和本 README 末尾的简短总结。导师没有替你改写 kernel 或补写个人结论。
 
 ## 1. 最少理论与接口
 
@@ -15,7 +17,7 @@ void softmax_cuda(const float* input, float* output, int rows, int hidden);
 - input/output 是调用者已分配的 GPU 指针，均为连续行主序 `[rows, hidden]` FP32；二者不重叠。接口只负责启动计算，不在其中分配、复制或做设备全局同步。
 - 本次测试只传入正 rows/hidden、有限 FP32 输入及有效指针；不扩展到原地运算、非连续 stride、空矩阵或 NaN/Inf 输入语义。
 - 输出与输入同形状；必须覆盖每个元素、结果有限且非负，每行和接近 1。
-- 三个实现分别编译为三个程序，同名 `softmax_cuda` 不会相互链接。`make_softmax_config` 的占位 grid=1/block=256 不代表正确配置，需要你按映射填写。
+- 三个实现分别编译为三个程序，同名 `softmax_cuda` 不会相互链接。启动配置已按映射补齐：naive 为 block=128、grid=ceil(rows/128)，shared/warp 为 block=256、grid=rows。
 
 ## 2. 你需要完成什么
 
@@ -133,8 +135,8 @@ CUDA_VISIBLE_DEVICES=0 nsys profile --trace=cuda --sample=none \
 提交三个源文件、Event TODO 实现、构建输出、23 个 shape 的正确性输出及退出码、三版 memcheck、三轮原始 Event 结果、三份 ncu 输出/报告位置，以及完成的 NOTES。最后在本 README 下方用自己的话简要总结实现和优化过程。
 
 - [ ] 从空 kernel 独立完成朴素版，不复制旧完整实现。
-- [ ] 两版优化展示 shared/reduction 和 warp/shuffle，边界与同步正确。
-- [ ] 三版全部正确性通过，CUDA 错误检查有效，memcheck 无错误与泄漏。
+- [x] 两版优化展示 shared/reduction 和 warp/shuffle，当前接口与测试范围内边界与同步正确。
+- [x] 三版全部正确性通过，CUDA 错误检查有效，memcheck 无错误与泄漏。
 - [ ] 独立补齐 Event 核心步骤，三版同条件 Benchmark 可复现，明确计时范围与单位。
 - [ ] 使用 Nsight Compute 解释性能与限制，不把单个指标当作因果证明；会区分 Nsight Systems 的时间线口径。
 - [ ] README/NOTES 解释每版改变了什么、预期影响、实际证据和未证实原因。

@@ -111,6 +111,10 @@ Matrix Add 在 `4096 × 4096` 上测得约 555.82 GB/s，对应算法有效带�
 
 Day 12 复审提醒：暖机用于排除首次初始化/执行及升频等非稳态影响，不代表之后每次 launch 没有成本。当前 [Softmax Benchmark 框架](07_softmax/softmax_harness.h) 在计时区间仍逐次调用 launch；若 GPU 等待主机提交下一次工作，Event 区间也可能包含这段空隙。当前测量方式是同一 stream 上 start → 重复 launch → stop，同步 stop 后取 `elapsed_ms / iterations`，不是每轮都在中间插入设备同步；分配、H2D/D2H 与正确性检查置于计时外。Event 的记录与同步语义见 [CUDA 11.8 GPU Timers](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-c-best-practices-guide/index.html#using-cuda-gpu-timers)。
 
+### 暖机后首轮仍明显偏慢，可以删掉或从另一组补数据吗？
+
+不能为了得到更大的加速比事后挑选结果。最终 Softmax 的 naive 独立三轮在 `(128,4096)` 为 1.243031/1.241932/1.242093 ms，极差/平均约 0.088%；后面的交替对照为 1.522018/1.240240/1.238577 ms，极差/平均约 21.25%。两组分别保留，不能把独立组的快值替换进交替组，也不能仅凭首轮偏慢就认定是升频。先按预定流程整组暖机、一次执行多轮交替复测；若仍波动，就记录并限制结论，不要求每个小 shape 都获得稳定收益。原始数据与最小命令见 [最终 Softmax 记录](10_final_softmax/NOTES.md)。
+
 ## 4. Global Memory、Coalescing 与 Sector
 
 ### 什么是合并访存？

@@ -20,15 +20,18 @@ float measure_final_softmax_ms(const float* input, float* output,
     CUDA_CHECK(cudaEventCreate(&stop));
 
     // TODO 1：在与 kernel 相同的 stream 上记录 start。
+    CUDA_CHECK(cudaEventRecord(start));
     for (int i = 0; i < iterations; ++i) {
         launch(input, output, rows, hidden);
     }
     // TODO 2：在相同 stream 上记录 stop。
+    CUDA_CHECK(cudaEventRecord(stop));
     CUDA_CHECK(cudaGetLastError());
     // TODO 3：等待 stop 完成，确保 GPU 时间戳已记录。
+    CUDA_CHECK(cudaEventSynchronize(stop));
     float total_ms = std::numeric_limits<float>::quiet_NaN();
     // TODO 4：取得 start/stop 的经过时间，写入 total_ms；单位是 ms。
-
+    CUDA_CHECK(cudaEventElapsedTime(&total_ms, start, stop));
     CUDA_CHECK(cudaEventDestroy(start));
     CUDA_CHECK(cudaEventDestroy(stop));
     // 未完成计时时保持 NaN，测试支撑会拒绝输出虚假性能结果。

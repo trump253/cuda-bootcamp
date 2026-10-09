@@ -104,7 +104,7 @@ cuda-bootcamp/
 - Day 11 Nsight Compute：三轮对照、Profile、收尾分析与基本调度解释已完成 Review，基础验收通过；绝对瓶颈表述已由导师收紧。
 - Day 12 综合复盘：10 个回答及第 4–7 题修订已完成 Review，复盘通过；最终独立验收仍待完成。
 
-当前任务是 [最终独立 Softmax 验收](10_final_softmax/README.md)：三版空 kernel、主机测试支撑与 Event TODO 已准备，先完成朴素版。[Day 12 综合复盘](notes/bootcamp_summary.md) 已通过；Day 11 数据与 Review 保留在 [分析笔记](09_ncu/NOTES.md)。Bootcamp 尚未最终验收完成，RMSNorm/fusion 不作为额外必修门槛。
+当前任务是 [最终独立 Softmax 验收](10_final_softmax/README.md)：三版实现与 Event 已完成，正确性、memcheck、源码及 Profile 已检查；交替对照的 naive 首轮偏慢，待一组复测及学习者自己的最终总结。完整数据与 Review 见 [最终实验记录](10_final_softmax/NOTES.md)。[Day 12 综合复盘](notes/bootcamp_summary.md) 已通过；Bootcamp 尚未最终验收完成，RMSNorm/fusion 不作为额外必修门槛。
 详细进度见 `PROGRESS.md`。
 已学习的问题与答案持续整理在 `CUDA_复习与面试问答.md`。
 
@@ -122,7 +122,7 @@ CUDA_VISIBLE_DEVICES=0 ./build/softmax_final_naive --correctness-only
 构建的 CUDA target 都会使用它，包括重新启用的历史 target。它不影响在项目外
 直接调用 `nvcc` 的命令；换 GPU 时可覆盖 CMake 变量 `CUDA_BOOTCAMP_ARCH`。
 
-Day 11 的正确性复查、三轮 Event 对照、ncu 报告与分析见 `09_ncu/README.md` 和 `09_ncu/NOTES.md`；已完成基础验收，不要求默认重新采集。最终验收使用新的独立实现与本轮数据，不以旧结果代替；空框架应 FAIL。Day 10 历史时间线与记录保留在 `08_nsys/`。
+Day 11 的正确性复查、三轮 Event 对照、ncu 报告与分析见 `09_ncu/README.md` 和 `09_ncu/NOTES.md`；已完成基础验收，不要求默认重新采集。最终验收使用本轮实现和测量，不以旧结果代替；三版现已通过 23 个 shape 的正确性检查。Day 10 历史时间线与记录保留在 `08_nsys/`。
 
 ## 协作方式
 

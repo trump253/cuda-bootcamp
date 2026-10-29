@@ -22,7 +22,11 @@ ssh -N -L 6080:127.0.0.1:6080 your-container
 
 ## 打开与观察报告
 
-在 GUI 中使用 `File → Open` 打开当前仓库 `build/` 下的 `.nsys-rep`。也可以在容器终端设置本次会话的显示变量后，直接运行熟悉的 `nsys-ui` 命令：
+在浏览器里的 Nsight Systems 窗口中使用 `File → Open`，可以打开当前容器内其他可访问目录中的 `.nsys-rep`，并不限于本仓库的 `build/`。文件对话框中的 `Look in` 是当前浏览位置；可以用顶部的上一级按钮逐级浏览，也可以在底部 `File name` 中输入 `/tmp/` 等绝对目录路径并回车，再选择报告。直接输入报告的绝对路径也可以打开。本次已实际验证从 `build/` 切换到 `/tmp`。
+
+6080 首页列出的 `vnc.html` 和版本目录是 noVNC 网页资源；报告文件通过桌面内的 `File → Open` 选择。文件选择器浏览的是当前容器的文件系统，宿主机上未挂载的目录和本地电脑上的文件需要先放到容器可访问的位置。
+
+也可以在容器终端设置本次会话的显示变量后，直接运行熟悉的 `nsys-ui` 命令。下面使用本仓库报告作为示例，最后一个参数可替换为其他目录的报告绝对路径：
 
 ```bash
 export DISPLAY=:99
@@ -32,7 +36,7 @@ export QTWEBENGINE_CHROMIUM_FLAGS=--no-sandbox
 nsys-ui build/day10_vector_add.nsys-rep
 ```
 
-这些变量只作用于当前终端。`DISPLAY` 指向虚拟屏幕；Mesa 的 llvmpipe 在 CPU 上渲染界面，本次实测 OpenGL 3.1；`QTWEBENGINE_CHROMIUM_FLAGS` 处理 root 运行 Qt WebEngine 的启动要求。
+这些变量只作用于当前终端。`DISPLAY` 指向虚拟屏幕；Mesa 的 llvmpipe 在 CPU 上渲染界面，本次实测 OpenGL 3.1；`QTWEBENGINE_CHROMIUM_FLAGS` 处理 root 运行 Qt WebEngine 的启动要求。GUI 启动前显示服务必须已经就绪；如果 `DISPLAY=:99 xdpyinfo >/dev/null` 失败，先按后面的完整启动步骤恢复显示服务。
 
 打开报告后，展开 GPU 下的 CUDA HW 行查看 kernel 与内存传输，再查看进程/线程下的 CUDA API 行。先缩放到第二组较大的 Vector Add 用例，按 [README.md](README.md) 的四个问题记录 CPU 调用、GPU 执行和同步。启动 GUI 的环境验证不替代 Day 10 的时间线分析验收。
 
@@ -44,7 +48,7 @@ nsys-ui build/day10_vector_add.nsys-rep
 
 ## 关闭窗口后重新打开
 
-只关闭本地浏览器标签页时，重新访问上面的 noVNC 入口即可，服务器上的程序继续运行。点击 Nsight Systems 标题栏的关闭按钮后，GUI 程序会退出；此时 noVNC 可能仍然连接着，但只显示黑色桌面。需要在容器的 SSH / VS Code 终端重新启动 GUI：
+只关闭本地浏览器标签页时，重新访问上面的 noVNC 入口即可，服务器上的程序继续运行。点击 Nsight Systems 标题栏的关闭按钮后，GUI 程序会退出；此时 noVNC 可能仍然连接着，但只显示黑色桌面。确认 `DISPLAY=:99 xdpyinfo >/dev/null` 成功、显示与连接服务仍在运行后，在容器的 SSH / VS Code 终端重新启动 GUI：
 
 ```bash
 cd /root/ai-infra-learning/cuda-bootcamp
@@ -134,6 +138,14 @@ printf '%s\n' "$!" >build/nsys-gui/websockify.pid
 ```
 
 随后按上一节设置环境变量并启动 `nsys-ui`。如果页面能打开但无法连接桌面，检查 x11vnc 与 websockify 日志；如果无法加载报告，检查 GUI 弹窗指出的动态库。
+
+## 按日志定位启动失败
+
+2026-10-29 的故障中，GUI 日志最后的致命错误是 `qt.qpa.xcb: could not connect to display :99`，随后 Qt 平台插件初始化失败；GUI 启动早于 Xvfb 就绪。检查时 Xvfb 与 Openbox 已运行，但 x11vnc、websockify 和 GUI 均未运行，5901 与 6080 端口也没有监听。已复用现有显示服务，补起这三个进程并重新打开报告。
+
+`Failed to adjust OOM score of renderer ... Permission denied (13)` 是 Qt WebEngine 调整子进程 OOM 优先级时的日志。本次成功启动后仍出现这条日志，但时间线和文件选择器均已验证可用，因此这条日志本身不是本次无法启动的原因，也不表示报告文件的读取权限不足。应结合最新启动时间、后续致命错误和实际进程状态判断。
+
+可先执行 `DISPLAY=:99 xdpyinfo >/dev/null` 确认显示入口；浏览器入口还依赖 x11vnc 的 5901 端口和 websockify 的 6080 端口。`build/nsys-gui/*.pid` 即使存在，对应进程也可能已退出，不能只根据 PID 文件判断服务存活。日志为追加保存，排查时要区分历史输出与本次启动记录。
 
 ## 本次缺库问题的原因
 

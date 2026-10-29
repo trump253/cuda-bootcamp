@@ -631,6 +631,18 @@ CUDA Bootcamp 最终验收通过 — 已达到进入 CUDALM 的最低能力门�
 - 已将学习者原始回答、最终修订、独立实现确认及导师修正分开保存，完成 `10_final_softmax/README.md` 的实现/优化/计时/限制总结与全部验收项。此次仅更新文档、核对证据，未改 kernel 或新运行 Benchmark/Profile。
 - CUDA Bootcamp 已达到进入 CUDALM 的最低能力门槛。本阶段结束，不再追加 FP16/float4/RMSNorm/fusion 等必修算子、复盘题或补测。
 
+## 工具环境维护（2026-10-29）
+
+- 已复核 GUI 日志：最近一次启动失败的致命错误是无法连接 `:99`，
+  GUI 启动早于 Xvfb 就绪；排查时显示服务已恢复，但 x11vnc、
+  websockify 与 GUI 未运行，旧 PID 文件仍保留，5901/6080 未监听。
+- 已复用现有 Xvfb 与 Openbox，补起 x11vnc、websockify 和 GUI。
+  OpenGL 3.1、HTTP 页面、WebSocket/RFB 帧缓冲与报告时间线检查通过；
+  Qt 的 OOM 优先级权限日志仍出现，但不阻止本次报告显示。
+- 已在真实 GUI 文件对话框中从 `build/` 切换到 `/tmp`，确认其他
+  容器目录可通过 `File → Open` 浏览；已补充绝对路径打开方法、
+  网页资源目录与报告选择器的区别，以及启动故障排查说明。
+
 ## 当前问题
 
 - Day 10 未将亚微秒 gap 的内部成因与 GPU 纯计算占比独立分解；

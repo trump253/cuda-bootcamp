@@ -523,6 +523,14 @@ Xvfb 只提供容器内的虚拟屏幕，想在本地看到它还需 VNC/noVNC �
 
 不需要。报告可以通过 `File → Open` 独立打开；`.qdproj` 保存项目配置，与 `.nsys-rep` 报告是不同的文件。误建空项目时，本机 Nsight Systems 2022.4.2 可先右键选择 `Unload`，再次右键选择 `Remove Project` 将其移出列表；磁盘目录仍会保留，需要另行清理。来源：[NVIDIA 已有报告的打开与共享说明](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#opening-an-existing-report)。
 
+### 日志出现 `Permission denied`，就说明 Nsight GUI 是因文件权限无法启动吗？
+
+不能只看这一行。本次 `Failed to adjust OOM score of renderer ... Permission denied (13)` 来自 Qt WebEngine 调整子进程 OOM 优先级；修复后这条日志仍出现，但报告时间线正常显示。实际阻断启动的是无法连接 `DISPLAY=:99`，并且 VNC 与网页服务当时也未运行。要按启动时间区分新旧日志，结合最后的致命错误、显示服务和连接服务状态判断，而不是直接放宽报告目录权限。
+
+### 浏览器里的 Nsight Systems 只能打开 `build/` 下的报告吗？
+
+可以打开当前容器内其他可访问目录的报告。使用桌面中的 `File → Open`，在文件对话框内浏览目录，或在 `File name` 输入报告的绝对路径；输入 `/tmp/` 等目录路径并回车也可以切换位置。6080 首页展示的是 noVNC 网页资源目录，和 GUI 的报告选择器是两个入口。宿主机未挂载到容器的目录、本地电脑上的文件不会自动出现在这个文件选择器中。
+
 ### 时间线中的 API Duration、GPU Duration 和 Latency 分别怎么算？
 
 API Duration 是 `CPU API 返回 − CPU API 开始`；GPU Duration 是 `GPU 工作结束 − GPU 工作开始`；本次 GUI 的 Latency 是 `GPU 工作开始 − CPU API 开始`。Vector Add 两次 H2D 的 97.345/167.495 µs 是启动间隔，实际 GPU 传输持续 428.925/373.918 µs。不能将 Latency 当作搬运或 kernel 执行时间。来源：[NVIDIA latency 与 overhead 说明](https://developer.nvidia.com/blog/understanding-the-visualization-of-overhead-and-latency-in-nsight-systems/)。

@@ -1,6 +1,27 @@
 # 容器内使用 Nsight Systems GUI
 
-本指南针对当前 Ubuntu 20.04 容器、Nsight Systems 2022.4.2，以及 SSH / VS Code Remote SSH 连接方式。2026-10-08 已补齐动态库并启动 Xvfb、Openbox、x11vnc 和 noVNC；随后将 noVNC 升级到 1.7.0，配置简体中文并缩短 VNC 更新等待时间。当前会话先从下面的端口转发开始。
+本指南针对当前 Ubuntu 20.04 容器、Nsight Systems 2022.4.2，以及 SSH / VS Code Remote SSH 连接方式。2026-10-08 已补齐动态库并配置 noVNC 1.7.0 简体中文入口；2026-10-29 新增统一启动脚本，日常启动优先使用下面的命令。
+
+## 下次启动
+
+在容器终端执行：
+
+```bash
+cd /root/ai-infra-learning/cuda-bootcamp
+python3 08_nsys/start_gui.py
+```
+
+脚本按就绪检查依次补齐 Xvfb、Openbox、x11vnc、websockify，最后启动 GUI。已有服务与 GUI 会复用，可以重复执行；启动的进程在后台运行。GUI 未运行时，默认打开 `build/day10_vector_add.nsys-rep`（文件存在时），之后可在 `File → Open` 选择其他报告。容器重启、关闭 GUI 或不确定服务是否还在时，都使用同一条命令。
+
+也可以指定报告，支持相对路径和绝对路径。将下面的示例路径换成实际报告路径；GUI 已运行时，脚本会发送打开报告的请求：
+
+```bash
+python3 08_nsys/start_gui.py /path/to/report.nsys-rep
+```
+
+首次恢复缺失的 noVNC 网页资源时，脚本会调用 `configure_novnc.py`；本地下载缓存也不存在时需要联网。缺少系统命令会提示先安装依赖，安装步骤见后面的手动启动章节。日志追加保存在 `build/nsys-gui/*.log`，启动失败时终端会给出对应日志路径。
+
+终端显示“启动完成”后，按下一节转发 6080 端口，打开目录首页并点击 `vnc.html`。
 
 ## 在本地看到界面
 
@@ -48,19 +69,14 @@ nsys-ui build/day10_vector_add.nsys-rep
 
 ## 关闭窗口后重新打开
 
-只关闭本地浏览器标签页时，重新访问上面的 noVNC 入口即可，服务器上的程序继续运行。点击 Nsight Systems 标题栏的关闭按钮后，GUI 程序会退出；此时 noVNC 可能仍然连接着，但只显示黑色桌面。确认 `DISPLAY=:99 xdpyinfo >/dev/null` 成功、显示与连接服务仍在运行后，在容器的 SSH / VS Code 终端重新启动 GUI：
+只关闭本地浏览器标签页时，重新访问上面的 noVNC 入口即可，服务器上的程序继续运行。点击 Nsight Systems 标题栏的关闭按钮后，GUI 程序会退出；此时 noVNC 可能仍然连接着，但只显示黑色桌面。在容器终端再次运行统一入口即可，它会检查并复用显示与连接服务，再启动 GUI：
 
 ```bash
 cd /root/ai-infra-learning/cuda-bootcamp
-mkdir -p build/nsys-gui
-nohup env DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 __GLX_VENDOR_LIBRARY_NAME=mesa \
-  QTWEBENGINE_CHROMIUM_FLAGS=--no-sandbox \
-  nsys-ui "$PWD/build/day10_vector_add.nsys-rep" \
-  >>build/nsys-gui/nsys-ui.log 2>&1 </dev/null &
-printf '%s\n' "$!" >build/nsys-gui/nsys-ui.pid
+python3 08_nsys/start_gui.py
 ```
 
-命令会在后台打开 Vector Add 报告，输出追加到 `build/nsys-gui/nsys-ui.log`，浏览器中的窗口会重新出现。查看其他报告时，替换 `.nsys-rep` 路径。已有的 Xvfb、x11vnc 和 websockify 继续使用；整个容器重启后则按后面的完整启动步骤恢复。
+浏览器中的窗口会重新出现。也可以给这条命令传入其他目录的报告路径，或在 GUI 中用 `File → Open` 切换报告。
 
 ## 简体中文与画面流畅度
 
@@ -85,13 +101,13 @@ x11vnc 已启用 X DAMAGE，更新等待设置为 `-wait 5 -defer 5`，并使用
 
 只关闭 Nsight 程序窗口时，保留目录，使用前面的 GUI 重开命令即可。`mkdir -p` 只能建立空目录，`nsys-ui` 只启动 GUI，二者不会恢复 noVNC 网页资源或启动显示与连接服务。
 
-如果要完整清理，先停止正在运行的 GUI、Openbox、Xvfb、x11vnc 和 websockify，再删除目录。下次恢复时，先运行 `python3 08_nsys/configure_novnc.py` 重建网页资源，再按照下一节恢复显示与连接服务，最后启动 `nsys-ui`。当前 websockify 启动时会切换到 `web/`；若已在运行中删掉目录，即使重新建立同名路径，也需要重启 websockify。
+如果要完整清理，先停止正在运行的 GUI、Openbox、Xvfb、x11vnc 和 websockify，再删除目录。下次运行 `python3 08_nsys/start_gui.py`，会先重建缺失的网页资源，再恢复显示与连接服务和 GUI。当前 websockify 启动时会切换到 `web/`；若已在运行中删掉目录，即使重新建立同名路径，也需要重启 websockify。
 
 当前报告 `build/day10_vector_add.nsys-rep` 位于这个子目录之外；只删除 `build/nsys-gui/` 不会删除这份报告。
 
-## 容器重启后重新启动
+## 手动启动与依赖安装
 
-当前组件已经运行。以下步骤用于显示服务退出后重建；重新创建容器时还需要再次安装依赖。命令从仓库根目录执行。
+日常恢复使用前面的统一启动脚本。以下步骤保留用于手动排查；重新创建容器时还需要再次安装依赖。手动启动命令用于相应服务未运行的情况，从仓库根目录执行。
 
 ```bash
 apt-get install -y --no-install-recommends \

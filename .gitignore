@@ -1,4 +1,5 @@
 /build/
+/08_nsys/__pycache__/
 /cmake-build-*/
 /CMakeFiles/
 /CMakeCache.txt
